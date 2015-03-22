@@ -20,7 +20,7 @@ class Detector:
         pass
 
 
-def what_changed(base_frame, new_frame, percent_threshold, max_change):
+def classify_change(base_frame, new_frame, percent_threshold, max_change):
     """
     Return 0: Nothing
     Return 1: New arrow
@@ -54,4 +54,11 @@ def what_changed(base_frame, new_frame, percent_threshold, max_change):
     else: # More has changed --> camera
         return (change_percent, 2)
 
+
+def locate_arrow(base_frame, dart_frame):
+    """
+    Return coordinates of arrow point.
+    """
+    # compute diff, and whatever else is needed to find location of arrow on the board
+    pass
 

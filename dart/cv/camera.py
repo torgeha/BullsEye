@@ -2,7 +2,7 @@
 import cv2
 import time
 
-from framediff import what_changed
+from framediff import classify_change
 
 class Camera:
 
@@ -25,7 +25,12 @@ class Camera:
     def capture(self):
 
         ret, base_frame = self.cap.read()
+        last_frame = base_frame
+        base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
+        last_frame_gray = base_frame_gray
+
         percent_threshold = 1.0 # Percent of the frame that is allowed to change without consequences
+
 
         # Fps stuff
         loop_delta = 1./self.fps_limit
@@ -57,12 +62,12 @@ class Camera:
                 cv2.imshow('Feed', new_frame)
 
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
-            base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
+
 
             # TODO: nothing changed? --> continue
             # TODO: camera/arrow --> wait x frames and find arrow_pos/set new base frame
 
-            change_percent, change = what_changed(base_frame_gray, new_frame_gray, percent_threshold, self.max_change)
+            change_percent, change = classify_change(last_frame_gray, new_frame_gray, percent_threshold, self.max_change)
 
             print "change: ", change_percent, " value: ", change
 
@@ -70,25 +75,24 @@ class Camera:
                 if last_frame_changed:
                     # last frame changed and is now stable, set new base_frame
                     base_frame = new_frame
+                    base_frame_gray = new_frame_gray
                     last_frame_changed = False
-                    print "new base"
+                    print "**************************  NEW BASE"
                 elif last_frame_arrow:
                     # Arrow detected in last frame, now stable, find location
-
+                    # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
                     # Set last_frame_arrow = False
                     last_frame_arrow = False
                 continue
             elif change == 1: # New arrow, wait until stable
                 last_frame_arrow = True
+                arrow_frame = new_frame
 
             elif change == 2: # Camera change, check next until no change, then set base
                 last_frame_changed = True
 
-            # TODO dont set base alwasy --> should be based on change
-            if loop_count < 5:
-                base_frame = new_frame
-                loop_count += 1
-                print "starting base"
+            last_frame = new_frame
+            last_frame_gray = new_frame_gray
 
             # Quit if "q" is pressed
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -97,4 +101,4 @@ class Camera:
 
 # Testing
 
-cam = Camera(0, 1, True)
+cam = Camera(0, 5, True)
