@@ -20,17 +20,29 @@ class Utility:
 
     @staticmethod
     def get_avg_pos(contours):
-        avg_pos_x = 0
-        avg_pos_y = 0
-        for cnt in contours:
-            M = cv2.moments(cnt)
-            avg_pos_x += int(M['m10']/M['m00'])
-            avg_pos_y += int(M['m01']/M['m00'])
-        avg_pos_x = avg_pos_x/len(contours)
-        avg_pos_y = avg_pos_y/len(contours)
-        return (avg_pos_x, avg_pos_y)
+        if(len(contours)>0):
+            avg_pos_x = 0
+            avg_pos_y = 0
+            for cnt in contours:
+                M = cv2.moments(cnt)
+                div = Utility._div(M['m00'])
+                avg_pos_x += int(M['m10']/div)
+                avg_pos_y += int(M['m01']/div)
+
+            avg_pos_x = avg_pos_x/len(contours)
+            avg_pos_y = avg_pos_y/len(contours)
+            return (avg_pos_x, avg_pos_y)
+        else:
+            return (-1, -1)
 
     @staticmethod
     def get_centroid(cnt):
         M = cv2.moments(cnt)
-        return (int(M['m10']/M['m00']), int(M['m01']/M['m00']))
+        div = Utility._div(M['m00'])
+        return (int(M['m10']/div), int(M['m01']/div))
+
+    @staticmethod
+    def _div(moment):
+        if moment == 0:
+            return 0.00001
+        return moment

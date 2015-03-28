@@ -51,10 +51,12 @@ class Board:
         return center
 
     def _fit_ellipse(self, contours):
-        cont = np.vstack(ctn for ctn in contours)
-        hull =  cv2.convexHull(cont)
-        ellipse = cv2.fitEllipse(hull)
-        return ellipse
+        if(len(contours)>4):
+            cont = np.vstack(ctn for ctn in contours)
+            hull =  cv2.convexHull(cont)
+            ellipse = cv2.fitEllipse(hull)
+            return ellipse
+        return None
 
     def _color_difference_segmentation(self, image):
         b,g,r = cv2.split(image)
