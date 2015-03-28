@@ -16,13 +16,12 @@ class Board:
         '''
         #TODO: Find outline
         #TODO: Find bullseye center
-        #TODO: Find red and green point areas.
         #TODO: Create a shape dscription and return it
         blurred = cv2.GaussianBlur(image,(5,5),0)
         outline = self._outline_segmentation(blurred)
-        score_areas = self._color_difference_segmentation(blurred)
-        #cv2.imshow("board",outline)
-        #cv2.imshow("b", blurred)
+        red_mask, green_mask = self._color_difference_segmentation(blurred)
+        cv2.imshow("board",red_mask)
+        cv2.imshow("b", blurred)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -30,6 +29,15 @@ class Board:
 
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
+
+    def _create_score_areas(self, mask):
+        #TODO: describe all areas, assign id for each description
+        #TODO: description should have x,y and size and id.
+        pass
+
+    def _identify_bullseye(self, descriptions):
+        #TODO: Find center of mass for red descriptions and return it as bullseye
+        pass
 
     def _color_difference_segmentation(self, image):
         b,g,r = cv2.split(image)
@@ -44,12 +52,15 @@ class Board:
         green = np.less(grey_diff, -self.green_limit)
 
         #Change datatype and values from 0-1 range to 0-255 range
-        red = np.array(red, dtype='uint8')
-        green = np.array(green, dtype='uint8')
-        red = red*255
-        green = green*255
-
+        red = self._convert_to_cv(red)
+        green = self._convert_to_cv(green)
+        #TODO: More robustness by opening and closing morp
         return red, green
+
+    def _convert_to_cv(self, normalized_matrix):
+        image = np.array(normalized_matrix, dtype='uint8')
+        image = image*255
+        return image
 
     def _outline_segmentation(self, image):
         #TODO: Use more robust method than thresholding
