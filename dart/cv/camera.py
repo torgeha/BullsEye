@@ -4,11 +4,23 @@ import time
 
 from framediff import classify_change
 
+print cv2.__version__
+
 class Camera:
 
-    def __init__(self, cam_interface, fps_limit, should_display):
+    def __init__(self, cam_interface, fps_limit, fps_eval, should_display, vid_src_path=None):
+        # fps_limit --> the fps the feed should read frames
+        # fps_eval --> the fps frames should be evaluated
+
         self.fps_limit = fps_limit
+        self.fps_eval = fps_eval
+        self.fps_fraction = self.fps_limit / self.fps_eval
+
         self.cap = cv2.VideoCapture(cam_interface)
+
+        if vid_src_path:
+            self.cap = cv2.VideoCapture(vid_src_path)
+
         self.should_display = should_display
 
         ret, frame = self.cap.read()
@@ -31,21 +43,22 @@ class Camera:
 
         percent_threshold = 1.0 # Percent of the frame that is allowed to change without consequences
 
-
         # Fps stuff
         loop_delta = 1./self.fps_limit
         current_time = target_time = time.clock()
         last_frame_changed = False
         last_frame_arrow = False
 
+        # Evaluation fps stuff
         loop_count = 0
 
         while (True):
-            # Sleep management.
+            # Sleep management. Limit fps.
             target_time += loop_delta
             sleep_time = target_time - time.clock()
             if sleep_time > 0:
                 time.sleep(sleep_time)
+                pass
 
             # Loop frequency evaluation, prints actual fps
             # previous_time, current_time = current_time, time.clock()
@@ -53,16 +66,23 @@ class Camera:
             # print 'frequency: %s' % (1. / time_delta)
 
             ret, new_frame = self.cap.read()
+            if not ret:
+                break # no more frames to read
+
+            # Continue if frame should not be evaluated
+            loop_count += 1
+            if loop_count <= self.fps_fraction:
+                continue
+            loop_count = 0
 
             print "lfc", last_frame_changed
-            # print "lfa", last_frame_arrow
+            print "lfa", last_frame_arrow
 
             # Display video feed?
             if self.should_display:
                 cv2.imshow('Feed', new_frame)
 
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
-
 
             # TODO: nothing changed? --> continue
             # TODO: camera/arrow --> wait x frames and find arrow_pos/set new base frame
@@ -76,6 +96,7 @@ class Camera:
                     # last frame changed and is now stable, set new base_frame
                     base_frame = new_frame
                     base_frame_gray = new_frame_gray
+                    cv2.imshow('baseframe', base_frame)
                     last_frame_changed = False
                     print "**************************  NEW BASE"
                 elif last_frame_arrow:
@@ -101,4 +122,9 @@ class Camera:
 
 # Testing
 
-cam = Camera(0, 5, True)
+path = "C:\Users\Torgeir\Desktop\dartH264"
+
+path = path + "\dart-anglechange.mp4"
+print path
+
+cam = Camera(0, 25, 5, True, path)
