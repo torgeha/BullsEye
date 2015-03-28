@@ -25,6 +25,9 @@ class Board:
         center = self._identify_bullseye(red_scores)
         outline = self._fit_ellipse(red_scores)
         cv2.circle(blurred, center, 5, (0, 255,100), thickness=2)
+        unified = []
+        unified.append(outline)
+        cv2.drawContours(blurred,unified,-1,(255,0,0),thickness=2)
         #cv2.imshow("red",red_mask)
         #cv2.imshow("green",green_mask)
         cv2.imshow("abc", blurred)
