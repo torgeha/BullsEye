@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
-
+from utility import Utility
 
 class Board:
 
     def __init__(self):
         self.green_limit = 60
-        self.red_limit = 70
+        self.red_limit = 60
 
 
     def detect(self, image):
@@ -20,7 +20,8 @@ class Board:
         blurred = cv2.GaussianBlur(image,(5,5),0)
         outline = self._outline_segmentation(blurred)
         red_mask, green_mask = self._color_difference_segmentation(blurred)
-        cv2.imshow("board",red_mask)
+        cv2.imshow("red",red_mask)
+        cv2.imshow("green",green_mask)
         cv2.imshow("b", blurred)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -52,25 +53,16 @@ class Board:
         green = np.less(grey_diff, -self.green_limit)
 
         #Change datatype and values from 0-1 range to 0-255 range
-        red = self._convert_to_cv(red)
-        green = self._convert_to_cv(green)
-        #TODO: More robustness by opening and closing morp
-        return red, green
+        red = Utility.convert_to_cv(red)
+        green = Utility.convert_to_cv(green)
 
-    def _convert_to_cv(self, normalized_matrix):
-        image = np.array(normalized_matrix, dtype='uint8')
-        image = image*255
-        return image
+        #Remove noise
+        red = Utility.remove_bw_noise(red)
+        green = Utility.remove_bw_noise(green)
+        return red, green
 
     def _outline_segmentation(self, image):
         #TODO: Use more robust method than thresholding
         grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         return thresh
-
-#TODO: CAN extract using hsv and inrange. FAST!
-#hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-#lower_blue = np.array([70,50,50])
-#upper_blue = np.array([90,255,255])
-#mask = cv2.inRange(hsv, lower_blue, upper_blue)
-#cv2.imshow("Mask", mask)
