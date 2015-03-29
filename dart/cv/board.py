@@ -78,8 +78,8 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, green[1], red[1], center, self.green_score, red=True)
-        mask = self._draw_sectors(mask, red[1],green[1], center, self.red_score, red=False)
+        mask = self._draw_sectors(mask, green[0], red[0], center, self.green_score, red=True)
+        mask = self._draw_sectors(mask, red[0],green[0], center, self.red_score, red=False)
         self._draw_special(mask, green, self.green_score, orient=orientation)
         self._draw_special(mask,red, self.red_score, orient=orientation)
         return mask
@@ -127,10 +127,11 @@ class Board:
         outer = score_areas[0]
         inner = score_areas[1]
         center = score_areas[2]
+
         for i in range(len(outer)):
-            cv2.drawContours(mask, [score_areas[i][2]], -1, 2*self.scores[i], thickness=-1)
+            cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
         for i in range(len(inner)):
-            cv2.drawContours(mask, [score_areas[i][2]], -1, 3*self.scores[i], thickness=-1)
+            cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
         cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
 
     def _extract_edges(self, image):
@@ -156,7 +157,7 @@ class Board:
             y_v = center[1] - y
             dist = math.sqrt(x_v**2+ y_v**2)
             a = Utility.angle(center, x, y)
-            if dist > 50:
+            if dist > 130:
                 #TODO: ellipse radius
                 outer_area.append((a,dist , cnt ))
             elif dist > 10:
