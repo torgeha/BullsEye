@@ -33,13 +33,14 @@ class Board:
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
         cv2.imshow("grid", orientation)
-        red_id = self._id_contours(red_scores,center, orientation)
-        green_id = self._id_contours(green_scores, center, orientation)
-        mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center)
+        red_id = self._id_contours(red_scores,center)
+        green_id = self._id_contours(green_scores, center)
+        mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
         return center, ellipse, mask
 
     def _is_valid(self, red_scores, green_scores):
         return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
+
 
     def _orientation(self, blurred, center, ellipse):
         #TODO: Optional orientation measure. Should work without this working. As long as
@@ -74,7 +75,7 @@ class Board:
         x,y = Utility.get_centroid(eleven[0])
         return Utility.angle(center, x, y)
 
-    def _create_score_mask(self, size, ellipse, red, green, center):
+    def _create_score_mask(self, size, ellipse, red, green, center, orientations):
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
