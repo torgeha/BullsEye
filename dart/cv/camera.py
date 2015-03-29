@@ -76,9 +76,9 @@ class Camera:
 
 
             # Loop frequency evaluation, prints actual fps
-            # previous_time, current_time = current_time, time.clock()
-            # time_delta = current_time - previous_time
-            # print 'frequency: %s' % (1. / time_delta)
+            previous_time, current_time = current_time, time.clock()
+            time_delta = current_time - previous_time
+            print 'frequency: %s' % (1. / time_delta)
 
             ret, new_frame = self.video.read()
             # new_frame = self.buffer.get_frame()

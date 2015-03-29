@@ -109,6 +109,10 @@ def _isolate_arrows(diff_img):
     open_thresh = cv2.morphologyEx(thresh_img, cv2.MORPH_OPEN, strel2)
     # cv2.imshow("open_thresh5", open_thresh)
 
+    # Dilating to merge blobs belonging to the same arrow together
+    strel3 = np.ones((5, 5), np.uint8)
+    open_thresh = cv2.morphologyEx(open_thresh, cv2.MORPH_DILATE, strel3)
+
     return open_thresh
 
 def _locate_arrow(bw_img):
@@ -116,6 +120,71 @@ def _locate_arrow(bw_img):
     Takes a bw-img with arrow contours.
     Return coordinates of arrows.
     """
+
+    # First merge arrows that are separated
+    cv2.imshow("bw", bw_img)
+
+
+    image, contours, hierarchy = cv2.findContours(bw_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    bw_img = cv2.drawContours(bw_img, contours, -1, 255)
+
+    cv2.imshow("cnt", bw_img)
+
+    # (x,y),(MA,ma),angle = cv2.fitEllipse(contours[0])
+    #
+    # print x, y
+    # print MA, ma
+    # print angle
+
+    # Find centroid of every cnt and point firthest away from it
+    centers = []
+    for cnt in contours:
+
+        M = cv2.moments(cnt)
+        centroid_x = int(M['m10']/M['m00'])
+        centroid_y = int(M['m01']/M['m00'])
+        centers.append((centroid_x, centroid_y))
+        # cv2.circle(bw_img, (centroid_x, centroid_y), 2, 255)
+
+    # TODO: Find the point furthest from centroid!!
+
+    # find extreme points
+    index = 0
+    for cnt in contours:
+        leftmost = tuple(cnt[cnt[:,:,0].argmin()][0])
+        rightmost = tuple(cnt[cnt[:,:,0].argmax()][0])
+        topmost = tuple(cnt[cnt[:,:,1].argmin()][0])
+        bottommost = tuple(cnt[cnt[:,:,1].argmax()][0])
+
+        # cv2.circle(bw_img, leftmost, 2, 255)
+        # cv2.circle(bw_img, rightmost, 2, 255)
+        # cv2.circle(bw_img, topmost, 2, 255)
+        # cv2.circle(bw_img, bottommost, 2, 255)
+
+        print leftmost, rightmost, topmost, bottommost
+        print centers[index]
+
+        dist = np.linalg.norm(leftmost - centers[index])
+
+        index += 1
+
+
+
+    cv2.imshow("mass", bw_img)
+
+    rows, cols = bw_img.shape[:2]
+    # print rows, cols
+
+    # loop through contours
+    # for i in range(len(contours)):
+    #     [vx, vy, x, y] = cv2.fitLine(contours[i], cv2.DIST_L2, 0, 0.01, 0.01)
+    #     # print vx, vy, x, y
+    #     lefty = int((-x * vy / vx) + y)
+    #     righty = int(((cols - x) * vy / vx) + y)
+    #     bw_img = cv2.line(bw_img, (cols - 1, righty), (0, lefty), 255, 2)
+    #
+    # cv2.imshow("line", bw_img)
+
     return 0, 0
 
 def _compute_diff(base_img, new_img):
@@ -128,19 +197,21 @@ def _compute_diff(base_img, new_img):
 
 # Testing
 
-# base = cv2.imread("C:\Users\Torgeir\Desktop\\base.jpg")
-# d1 = cv2.imread("C:\Users\Torgeir\Desktop\d1.jpg")
-# d2 = cv2.imread("C:\Users\Torgeir\Desktop\d2.jpg")
+base = cv2.imread("C:\Users\Torgeir\Desktop\\base.jpg")
+d1 = cv2.imread("C:\Users\Torgeir\Desktop\d1.jpg")
+d2 = cv2.imread("C:\Users\Torgeir\Desktop\d2.jpg")
 #
 # width = len(base[0])
 # height = len(base)
 # nof_pixels = width * height
 # max_change = nof_pixels * 255
 #
-# grayb = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY)
-# d1g = cv2.cvtColor(d1, cv2.COLOR_BGR2GRAY)
-# d2g = cv2.cvtColor(d2, cv2.COLOR_BGR2GRAY)
-#
+grayb = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY)
+d1g = cv2.cvtColor(d1, cv2.COLOR_BGR2GRAY)
+d2g = cv2.cvtColor(d2, cv2.COLOR_BGR2GRAY)
+
+find_arrow(grayb, d2g)
+
 # # cv2.imshow("base", grayb)
 # # cv2.imshow("d1", d1g)
 # # cv2.imshow("d2", d2g)
@@ -153,5 +224,5 @@ def _compute_diff(base_img, new_img):
 # print classify_change(grayb, d2g, 1.0, max_change)
 #
 #
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+cv2.waitKey(0)
+cv2.destroyAllWindows()
