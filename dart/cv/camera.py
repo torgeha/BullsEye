@@ -4,7 +4,7 @@ import time
 import threading
 from Queue import Queue
 
-from framediff import classify_change
+from framediff import classify_change, find_arrow
 
 print cv2.__version__
 
@@ -14,22 +14,24 @@ class Camera:
         # fps_limit --> the fps the feed should read frames
         # fps_eval --> the fps frames should be evaluated
 
-        self.buffer = CameraBuffer(cam_interface, vid_src_path)
+        # self.buffer = CameraBuffer(cam_interface, vid_src_path)
         self.fps_limit = fps_limit
         self.fps_eval = fps_eval
         self.fps_fraction = self.fps_limit / self.fps_eval
 
-        # self.cap = cv2.VideoCapture(cam_interface)
-
-        # if vid_src_path:
-        #     self.cap = cv2.VideoCapture(vid_src_path)
+        self.video = cv2.VideoCapture(cam_interface)
+        self.is_live = True
+        if vid_src_path:
+            self.is_live = False
+            self.video = cv2.VideoCapture(vid_src_path)
 
         self.should_display = should_display
 
         # ret, frame = self.cap.read()
-        if self.buffer.buffer.empty():
-            time.sleep(0.5)
-        frame = self.buffer.get_frame()
+        # if self.buffer.buffer.empty():
+        #     time.sleep(0.5)
+        # frame = self.buffer.get_frame()
+        ret, frame = self.video.read()
         self.width = len(frame[0])
         self.height = len(frame)
         self.nof_pixels = self.width * self.height
@@ -42,13 +44,13 @@ class Camera:
 
     def capture(self):
 
-        # ret, base_frame = self.cap.read()
-        base_frame = self.buffer.get_frame()
+        ret, base_frame = self.video.read()
+        # base_frame = self.buffer.get_frame()
         last_frame = base_frame
         base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
         last_frame_gray = base_frame_gray
 
-        percent_threshold = 1.0 # Percent of the frame that is allowed to change without consequences
+        percent_threshold = 0.01 # TODO: This should be based on bounding box of dart board! This would make distance from board unimportant
 
         # Fps stuff
         loop_delta = 1./self.fps_limit
@@ -56,15 +58,21 @@ class Camera:
         last_frame_changed = False
         last_frame_arrow = False
 
+        # If live feed, dont wait, else wait
+        wait_per_frame = 25
+        if self.is_live:
+            wait_per_frame = 1
+
         # Evaluation fps stuff
         loop_count = 0
 
         while (True):
             # Sleep management. Limit fps.
-            # target_time += loop_delta
-            # sleep_time = target_time - time.clock()
-            # if sleep_time > 0:
-            #     time.sleep(sleep_time)
+            if self.is_live: # only sleep
+                target_time += loop_delta
+                sleep_time = target_time - time.clock()
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
 
 
             # Loop frequency evaluation, prints actual fps
@@ -72,20 +80,14 @@ class Camera:
             # time_delta = current_time - previous_time
             # print 'frequency: %s' % (1. / time_delta)
 
-            # ret, new_frame = self.cap.read()
-            new_frame = self.buffer.get_frame()
+            ret, new_frame = self.video.read()
+            # new_frame = self.buffer.get_frame()
             if new_frame == None:
                 print "END OF VIDEO, BREAKING"
                 break # no more frames to read
 
-            # Continue if frame should not be evaluated
-            # loop_count += 1
-            # if loop_count <= self.fps_fraction:
-            #     continue
-            # loop_count = 0
-
-            print "lfc", last_frame_changed
-            print "lfa", last_frame_arrow
+            # print "lfc", last_frame_changed
+            # print "lfa", last_frame_arrow
 
             # Display video feed?
             # if self.should_display:
@@ -100,7 +102,7 @@ class Camera:
 
             print "change: ", change_percent, " value: ", change
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(wait_per_frame) & 0xFF == ord('q'):
                 break
 
             if change == 0: # Nothing changed, continue
@@ -115,7 +117,10 @@ class Camera:
                     # Arrow detected in last frame, now stable, find location
                     # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
                     frame_with_arrow = last_frame
-                    cv2.imshow("arrow", frame_with_arrow)
+                    # cv2.imshow("arrow", frame_with_arrow)
+                    cv2.imshow("arrowgray", last_frame_gray)
+
+                    find_arrow(base_frame_gray, last_frame_gray)
 
                     # Set last_frame_arrow = False
                     last_frame_arrow = False
@@ -130,18 +135,11 @@ class Camera:
             last_frame = new_frame
             last_frame_gray = new_frame_gray
 
-            # Quit if "q" is pressed
-            # target_time += loop_delta
-            # sleep_time = target_time - time.clock()
-            # print "-------------------------------------------------------------"
-            # print sleep_time
-            # if sleep_time <= 0:
-            #     sleep_time = 1
-
         cv2.destroyAllWindows()
 
 class CameraBuffer:
     # TODO: run in own thread??
+    # DO NOT USE!!!
 
     def __init__(self, interface, path=None):
         """
@@ -224,4 +222,4 @@ path = path + "\dart2.mp4"
 
 print path
 
-cam = Camera(2, 25, 5, True)
+cam = Camera(2, 5, 5, True)
