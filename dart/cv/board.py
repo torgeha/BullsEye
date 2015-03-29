@@ -32,7 +32,6 @@ class Board:
         center = self._identify_bullseye(red_scores)
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
-        cv2.imshow("grid", orientation)
         red_id = self._id_contours(red_scores,center)
         green_id = self._id_contours(green_scores, center)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
@@ -79,10 +78,10 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, green, red, center, self.green_score, red=True)
-        mask = self._draw_sectors(mask, red,green, center, self.red_score, red=False)
-        self._draw_special(mask, green, self.green_score)
-        self._draw_special(mask,red, self.red_score)
+        #mask = self._draw_sectors(mask, green, red, center, self.green_score, red=True)
+        #mask = self._draw_sectors(mask, red,green, center, self.red_score, red=False)
+        self._draw_special(mask, green, orientations, self.green_score)
+        self._draw_special(mask,red, orientations, self.red_score)
         return mask
 
     def _draw_sectors(self, mask, sectors, adjusters, center, score, red=True):
