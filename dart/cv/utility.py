@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+import math
 
 class Utility:
 
@@ -40,6 +40,17 @@ class Utility:
         M = cv2.moments(cnt)
         div = Utility._div(M['m00'])
         return (int(M['m10']/div), int(M['m01']/div))
+
+    @staticmethod
+    def expand(mask ,kernel=None):
+        if not kernel:
+            kernel = np.ones((3,3),np.uint8)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+        return mask
+
+    @staticmethod
+    def angle( center, x,y):
+        return math.atan2(center[0]-x, center[1]-y)
 
     @staticmethod
     def _div(moment):
