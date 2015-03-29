@@ -57,8 +57,8 @@ class Board:
             g2 = green[(i+2)%(len(red)-1)][2]
             v =  red[i][0]
 
-            if  v> 2.5 or v<-2.0 or (v>0 and v<1.2):
-                #If angle is this
+            if  v> 2.5 or v<-2.0 or (v>-0.5 and v<1.2):
+                #If angle is v, means top and bottom extreme points has to be used as e1 and e2
                 topmost = np.array(t[t[:,:,1].argmin()][0])
                 g_bottom = np.array(g1[g1[:,:,1].argmax()][0])
                 g_top = np.array(g2[g2[:,:,1].argmin()][0])
@@ -67,13 +67,14 @@ class Board:
                 e1 = (topmost + g_bottom) / 2
                 e2 = (bottommost + g_top) / 2
             else:
+                #If not angle fit the if statement, left and right extreme points has to be used as e1, and e2
                 g_right = np.array(g2[g2[:,:,0].argmax()][0])
                 g_left = np.array(g1[g1[:,:,0].argmin()][0])
                 leftmost = np.array(t[t[:,:,0].argmin()][0])
                 rightmost = np.array(t[t[:,:,0].argmax()][0])
                 e1 = (leftmost + g_right) / 2
                 e2 = (rightmost + g_left) / 2
-            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), 255)
+            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), self.red_score[int(math.floor(i/2))])
         return mask
 
     def _draw_special(self, mask, score_areas, scores):
@@ -83,6 +84,8 @@ class Board:
             print(int(math.floor(i/2)))
             score = (3- i%2) * self.red_score[int(math.floor(i/2))]
             cv2.drawContours(mask, [r[2]], -1, score, thickness=-1)
+            #cv2.imshow("t", mask)
+            #cv2.waitKey(-1)
         cv2.drawContours(mask, [score_areas[-1][2]], -1, scores[-1], thickness=-1)
 
     def _extract_edges(self, image):
@@ -154,7 +157,9 @@ class Board:
 
         #Remove noise
         red = Utility.remove_bw_noise(red)
+        red = Utility.expand(red)
         green = Utility.remove_bw_noise(green)
+        green = Utility.expand(green)
         return red, green
 
     def _outline_segmentation(self, image):

@@ -42,6 +42,13 @@ class Utility:
         return (int(M['m10']/div), int(M['m01']/div))
 
     @staticmethod
+    def expand(mask ,kernel=None):
+        if not kernel:
+            kernel = np.ones((3,3),np.uint8)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+        return mask
+
+    @staticmethod
     def _div(moment):
         if moment == 0:
             return 0.00001
