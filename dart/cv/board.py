@@ -16,13 +16,17 @@ class Board:
         '''
 
         blurred = cv2.GaussianBlur(image,(5,5),0)
-        #outline = self._outline_segmentation(blurred)
+        grid = self._extract_edges(blurred)
         red_mask, green_mask = self._color_difference_segmentation(blurred)
         red_scores = self._create_score_areas(red_mask)
         green_scores = self._create_score_areas(green_mask)
+        ellipse, approx_hull = self._fit_ellipse(red_scores)
+        cv2.ellipse(grid, ellipse, (0,0,255))
         center = self._identify_bullseye(red_scores)
-        outline = self._fit_ellipse(red_scores)
-        return center, outline, red_scores, green_scores
+        #cv2.imshow("grid", grid)
+        #cv2.waitKey(-1)
+        #cv2.destroyAllWindows()
+        return center, ellipse, red_scores, green_scores
 
 
 
@@ -55,18 +59,16 @@ class Board:
             cont = np.vstack(ctn for ctn in contours)
             hull =  cv2.convexHull(cont)
             ellipse = cv2.fitEllipse(hull)
-            return ellipse
+            return ellipse, hull
         return None
 
     def _color_difference_segmentation(self, image):
         b,g,r = cv2.split(image)
 
-        #Opencv use usigned i bit integers 0-255. But need negative values. Use int 16 instead
-        g = np.array(g, dtype="int16")
-        r = np.array(r, dtype="int16")
-
         #Filter out all r/g pairs with a lower difference than red and green limit. Black and white gone
-        grey_diff = r-g
+        #TODO: use subtract
+        grey_diff = cv2.subtract(r, g, dtype=cv2.CV_16S)
+
         red = np.greater(grey_diff, self.red_limit)
         green = np.less(grey_diff, -self.green_limit)
 
