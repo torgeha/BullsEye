@@ -21,7 +21,7 @@ class Board:
         '''
 
         blurred = cv2.GaussianBlur(image,(5,5),0)
-
+        #TODO: Make outline and center available as self.
         red_mask, green_mask = self._color_difference_segmentation(blurred)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
@@ -32,8 +32,8 @@ class Board:
         center = self._identify_bullseye(red_scores)
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
-        red_id = self._id_contours(red_scores,center)
-        green_id = self._id_contours(green_scores, center)
+        red_id = self._id_contours(red_scores,center, ellipse)
+        green_id = self._id_contours(green_scores, center, ellipse)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
         return center, ellipse, mask
 
@@ -78,8 +78,8 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        #mask = self._draw_sectors(mask, green, red, center, self.green_score, red=True)
-        #mask = self._draw_sectors(mask, red,green, center, self.red_score, red=False)
+        mask = self._draw_sectors(mask, green[1], red[1], center, self.green_score, red=True)
+        mask = self._draw_sectors(mask, red[1],green[1], center, self.red_score, red=False)
         self._draw_special(mask, green, self.green_score, orient=orientation)
         self._draw_special(mask,red, self.red_score, orient=orientation)
         return mask
@@ -90,11 +90,11 @@ class Board:
         combined with the center points becomes a sector.
         '''
         previous = 0
-        next = 2
+        next = 1
         if red:
-            previous = -2
+            previous = -1
             next = 0
-        for i in range(1,len(sectors)-1, 2):
+        for i in range(1,len(sectors)-1):
             t = sectors[i][2]
             g1 = adjusters[(i+previous)%(len(sectors)-1)][2]
             g2 = adjusters[(i+next)%(len(sectors)-1)][2]
@@ -117,15 +117,21 @@ class Board:
                 rightmost = np.array(t[t[:,:,0].argmax()][0])
                 e1 = (leftmost + g_right) / 2
                 e2 = (rightmost + g_left) / 2
+            cv2.drawContours(mask, sectors[i][2], -1, 255, thickness=1)
+            cv2.imshow("dfg", mask)
+            cv2.waitKey(-1)
             cv2.fillConvexPoly(mask, np.array([e1, e2, center]), score[int(math.floor(i/2))])
         return mask
 
     def _draw_special(self, mask, score_areas, scores, orient=0):
-        for i in range(len(score_areas)-1):
-            r = score_areas[i]
-            score = (3- i%2) * self.red_score[int(math.floor(i/2))]
-            cv2.drawContours(mask, [r[2]], -1, score, thickness=-1)
-        cv2.drawContours(mask, [score_areas[-1][2]], -1, scores[-1], thickness=-1)
+        outer = score_areas[0]
+        inner = score_areas[1]
+        center = score_areas[2]
+        for i in range(len(outer)):
+            cv2.drawContours(mask, [score_areas[i][2]], -1, 2*self.scores[i], thickness=-1)
+        for i in range(len(inner)):
+            cv2.drawContours(mask, [score_areas[i][2]], -1, 3*self.scores[i], thickness=-1)
+        cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
 
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
@@ -136,25 +142,31 @@ class Board:
         print(len(contours))
         return contours
 
-    def _id_contours(self, contours, center):
+    def _id_contours(self, contours, center, ellipse):
         if(len(contours)>22):
             #TODO: Make more robust than this
             raise Exception("TOO many score areas identified!!!")
-        sorted_contours = []
+        outer_area = []
+        inner_area = []
+
         c = None
         for cnt in contours:
             x,y = Utility.get_centroid(cnt)
             x_v = center[0] -x
             y_v = center[1] - y
-            dist = x_v**2+ y_v**2
+            dist = math.sqrt(x_v**2+ y_v**2)
             a = Utility.angle(center, x, y)
-            if math.sqrt(dist) > 10:
-                sorted_contours.append((a,dist , cnt))
+            if dist > 50:
+                #TODO: ellipse radius
+                outer_area.append((a,dist , cnt ))
+            elif dist > 10:
+                inner_area.append((a,dist,cnt))
             else:
                 c = (a,dist , cnt)
-        sorted_contours.sort(key=lambda k: (round(k[0], 1), k[1]))
-        sorted_contours.append(c)
-        return sorted_contours
+        outer_area.sort(key=lambda k: k[0])
+        inner_area.sort(key=lambda k: k[0])
+
+        return (outer_area, inner_area, c)
 
 
     def _identify_bullseye(self, descriptions):

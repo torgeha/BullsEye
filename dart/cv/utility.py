@@ -36,6 +36,13 @@ class Utility:
             return (-1, -1)
 
     @staticmethod
+    def to_degree(angle):
+        angle = angle * 360 / (2*math.pi);
+        if (angle < 0):
+            angle = angle + 360;
+
+
+    @staticmethod
     def get_centroid(cnt):
         M = cv2.moments(cnt)
         div = Utility._div(M['m00'])
