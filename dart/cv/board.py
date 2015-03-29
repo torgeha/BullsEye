@@ -29,10 +29,10 @@ class Board:
             #TODO: error handling. Remove or fix stuff
             return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
-        orientation = self._orientation(blurred, ellipse)
-
-        cv2.imshow("grid", orientation)
         center = self._identify_bullseye(red_scores)
+        orientation = self._orientation(blurred, center, ellipse)
+        print(orientation)
+        cv2.imshow("grid", orientation)
         red_id = self._id_contours(red_scores,center)
         green_id = self._id_contours(green_scores, center)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center)
@@ -41,19 +41,40 @@ class Board:
     def _is_valid(self, red_scores, green_scores):
         return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
 
-    def _orientation(self, blurred, ellipse):
+    def _orientation(self, blurred, center, ellipse):
         #TODO: Optional orientation measure. Should work without this working. As long as
         #Camera is the right way
-        grid = self._outline_segmentation(blurred)
-        grid = cv2.ellipse(grid, ellipse, (0,0,0), thickness=-1)
+        number_mask = self._outline_segmentation(blurred)
+        number_mask = cv2.ellipse(number_mask, ellipse, (0,0,0), thickness=-1)
         wide_ellipse = (ellipse[0], (ellipse[1][0]*1.29,ellipse[1][1]*1.29) , ellipse[2])
-        mask = np.zeros(grid.shape, np.uint8)
-        cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
-        grid = cv2.multiply(grid, mask)
-        cv2.imshow("iejdf", grid)
-        grid = cv2.erode(grid,  np.ones((2,2),np.uint8))
+        mask = np.zeros(number_mask.shape, np.uint8)
 
-        return grid
+        cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
+        number_mask = cv2.multiply(number_mask, mask)
+        number_mask = cv2.erode(number_mask,  np.ones((2,2),np.uint8))
+        img,contours,hierarchy = cv2.findContours(number_mask,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        children = []
+        w = wide_ellipse[1][0]-ellipse[1][0]
+        lowest = float('inf')
+        eleven = None
+        for c in range(len(contours)-1):
+            #TODO: Reduce double calculations
+            c1 = contours[c]
+            c2 = contours[c+1]
+            cc1 = Utility.get_centroid(c1)
+            cc2 = Utility.get_centroid(c2)
+            d = abs(cc1[0] - cc2[0]) + abs(cc1[1] - cc2[1])
+            m1 = (cv2.contourArea(c1)/cv2.arcLength(c1, True))
+            m2 = (cv2.contourArea(c2)/cv2.arcLength(c2, True))
+
+            if d < w and m1 + m2< lowest:
+                #TODO: less than 30 not robust!!
+                lowest = m1 + m2
+                eleven = c1, c2
+        x,y = Utility.get_centroid(eleven[0])
+        x_v = center[0] -x
+        y_v = center[1] - y
+        return math.atan2(y_v, x_v)
 
     def _create_score_mask(self, size, ellipse, red, green, center):
         shape = (size[0], size[1])
