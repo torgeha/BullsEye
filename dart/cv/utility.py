@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+import math
 
 class Utility:
 
@@ -48,6 +48,8 @@ class Utility:
         mask = cv2.dilate(mask, kernel, iterations=1)
         return mask
 
+    def angle(self, center, x,y):
+        return math.atan2(center[0]-x, center[1]-y)
     @staticmethod
     def _div(moment):
         if moment == 0:

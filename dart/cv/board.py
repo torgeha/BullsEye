@@ -33,8 +33,8 @@ class Board:
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
         cv2.imshow("grid", orientation)
-        red_id = self._id_contours(red_scores,center)
-        green_id = self._id_contours(green_scores, center)
+        red_id = self._id_contours(red_scores,center, orientation)
+        green_id = self._id_contours(green_scores, center, orientation)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center)
         return center, ellipse, mask
 
@@ -72,9 +72,7 @@ class Board:
                 lowest = m1 + m2
                 eleven = c1, c2
         x,y = Utility.get_centroid(eleven[0])
-        x_v = center[0] -x
-        y_v = center[1] - y
-        return math.atan2(y_v, x_v)
+        return Utility.angle(center, x, y)
 
     def _create_score_mask(self, size, ellipse, red, green, center):
         shape = (size[0], size[1])
@@ -150,16 +148,15 @@ class Board:
             x_v = center[0] -x
             y_v = center[1] - y
             dist = x_v**2+ y_v**2
+            a = Utility.angle(center, x, y)
             if math.sqrt(dist) > 10:
-                sorted_contours.append((math.atan2(y_v,x_v),dist , cnt))
+                sorted_contours.append((a,dist , cnt))
             else:
-                c = (math.atan2(y_v,x_v),dist , cnt)
+                c = (a,dist , cnt)
         sorted_contours.sort(key=lambda k: (round(k[0], 1), k[1]))
         sorted_contours.append(c)
         return sorted_contours
 
-    def _angle(self, a1, a2):
-        return np.arccos((a1 * a2) / (np.abs(a1) * np.abs(a2)))
 
     def _identify_bullseye(self, descriptions):
         #TODO: MAKE MORE ROBUST. AVG_pos not that great!
