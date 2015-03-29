@@ -1,13 +1,17 @@
 import cv2
 import numpy as np
 from utility import Utility
+import math
 
 class Board:
+    DEFAULT_RED_SCORES = [10,2,3,7,8,14,12,20, 18, 13]
+    DEFAULT_GREEN_SCORES = [6,15,17,19,16,11,9,5,1,4]
 
-    def __init__(self):
+    def __init__(self, red_score=DEFAULT_RED_SCORES, green_score=DEFAULT_GREEN_SCORES):
         self.green_limit = 60
         self.red_limit = 60
-
+        self.red_score = red_score
+        self.green_score = green_score
 
     def detect(self, image):
         '''
@@ -23,12 +27,30 @@ class Board:
         ellipse, approx_hull = self._fit_ellipse(red_scores)
         cv2.ellipse(grid, ellipse, (0,0,255))
         center = self._identify_bullseye(red_scores)
-        #cv2.imshow("grid", grid)
-        #cv2.waitKey(-1)
-        #cv2.destroyAllWindows()
+        red_id = self._id_contours(red_scores,center)
+        green_id = self._id_contours(green_scores, center)
+        mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center)
+        #cv2.drawContours(mask, id[6][2], -1, 200, thickness=-1)
+        cv2.imshow("mask", mask)
+        cv2.waitKey(-1)
+        cv2.destroyAllWindows()
         return center, ellipse, red_scores, green_scores
 
 
+    def _create_score_mask(self, size, ellipse, red, green, center):
+        shape = (size[0], size[1])
+        mask = np.zeros(shape, np.uint8)
+        cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
+        self._draw_special(mask, green, self.green_score)
+        self._draw_special(mask,red, self.red_score)
+        return mask
+
+    def _draw_special(self, mask, score_areas, scores):
+        for i,r in enumerate(score_areas):
+            print(int(math.floor(i/2)))
+            score = (2+ i%2) * self.red_score[int(math.floor(i/2))]
+            print(score)
+            cv2.drawContours(mask, [r[2]], -1, score, thickness=-1)
 
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
@@ -40,8 +62,32 @@ class Board:
         print(len(contours))
         return contours
 
+    def _id_contours(self, contours, center):
+        if(len(contours)>22):
+            #TODO: Make more robust than this
+            raise Exception("TOO many score areas identified!!!")
+        sorted_contours = []
+        center = None
+        for cnt in contours:
+            x,y = Utility.get_centroid(cnt)
+            x_v = center[0] -x
+            y_v = center[1] - y
+            dist = x_v**2+ y_v**2
+            if math.sqrt(dist) > 10:
+                sorted_contours.append((math.atan2(y_v,x_v),dist , cnt))
+            else:
+                center = (math.atan2(y_v,x_v),dist , cnt)
+        sorted_contours.sort(key=lambda k: (k[0], k[1]))
+        sorted_contours.append(center)
+        return sorted_contours
+
+    def _angle(self, a1, a2):
+        print(a1)
+        print(a2)
+        return np.arccos((a1 * a2) / (np.abs(a1) * np.abs(a2)))
 
     def _identify_bullseye(self, descriptions):
+        #TODO: MAKE MORE ROBUST. AVG_pos not that great!
         avg_x, avg_y = Utility.get_avg_pos(descriptions)
         min_dist = float("inf")
         center = None
@@ -66,9 +112,7 @@ class Board:
         b,g,r = cv2.split(image)
 
         #Filter out all r/g pairs with a lower difference than red and green limit. Black and white gone
-        #TODO: use subtract
         grey_diff = cv2.subtract(r, g, dtype=cv2.CV_16S)
-
         red = np.greater(grey_diff, self.red_limit)
         green = np.less(grey_diff, -self.green_limit)
 
