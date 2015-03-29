@@ -21,15 +21,17 @@ class Board:
         '''
 
         blurred = cv2.GaussianBlur(image,(5,5),0)
-        grid = self._extract_edges(blurred)
+
         red_mask, green_mask = self._color_difference_segmentation(blurred)
-        red_scores = self._create_score_areas(red_mask)
-        green_scores = self._create_score_areas(green_mask)
+        red_scores = self._create_description_areas(red_mask)
+        green_scores = self._create_description_areas(green_mask)
         if not self._is_valid(red_scores, green_scores):
             #TODO: error handling. Remove or fix stuff
             return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
-        cv2.ellipse(grid, ellipse, (0,0,255))
+        orientation = self._orientation(blurred, ellipse)
+
+        cv2.imshow("grid", orientation)
         center = self._identify_bullseye(red_scores)
         red_id = self._id_contours(red_scores,center)
         green_id = self._id_contours(green_scores, center)
@@ -38,6 +40,20 @@ class Board:
 
     def _is_valid(self, red_scores, green_scores):
         return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
+
+    def _orientation(self, blurred, ellipse):
+        #TODO: Optional orientation measure. Should work without this working. As long as
+        #Camera is the right way
+        grid = self._outline_segmentation(blurred)
+        grid = cv2.ellipse(grid, ellipse, (0,0,0), thickness=-1)
+        wide_ellipse = (ellipse[0], (ellipse[1][0]*1.29,ellipse[1][1]*1.29) , ellipse[2])
+        mask = np.zeros(grid.shape, np.uint8)
+        cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
+        grid = cv2.multiply(grid, mask)
+        cv2.imshow("iejdf", grid)
+        grid = cv2.erode(grid,  np.ones((2,2),np.uint8))
+
+        return grid
 
     def _create_score_mask(self, size, ellipse, red, green, center):
         shape = (size[0], size[1])
@@ -96,9 +112,9 @@ class Board:
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
 
-    def _create_score_areas(self, mask):
+    def _create_description_areas(self, mask):
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
-        img,contours,hierarchy = cv2.findContours(mask.copy(),cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         print(len(contours))
         return contours
 
@@ -166,7 +182,6 @@ class Board:
         return red, green
 
     def _outline_segmentation(self, image):
-        #TODO: Use more robust method than thresholding
         grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         return thresh
