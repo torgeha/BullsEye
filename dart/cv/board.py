@@ -4,8 +4,8 @@ from utility import Utility
 import math
 
 class Board:
-    DEFAULT_RED_SCORES = [10,2,3,7,8,14,12,20, 18, 13]
-    DEFAULT_GREEN_SCORES = [6,15,17,19,16,11,9,5,1,4]
+    DEFAULT_RED_SCORES = [10,2,3,7,8,14,12,20, 18, 13, 50]
+    DEFAULT_GREEN_SCORES = [6,15,17,19,16,11,9,5,1,4, 25]
 
     def __init__(self, red_score=DEFAULT_RED_SCORES, green_score=DEFAULT_GREEN_SCORES):
         self.green_limit = 60
@@ -41,22 +41,54 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
+        mask = self._draw_sectors(mask, red,green, center)
         self._draw_special(mask, green, self.green_score)
         self._draw_special(mask,red, self.red_score)
         return mask
 
+    def _draw_sectors(self, mask, red, green, center):
+        '''
+        Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
+        combined with the center points becomes a sector.
+        '''
+        for i in range(1,len(red)-1, 2):
+            t = red[i][2]
+            g1 = green[i][2]
+            g2 = green[(i+2)%(len(red)-1)][2]
+            v =  red[i][0]
+
+            if  v> 2.5 or v<-2.0 or (v>0 and v<1.2):
+                #If angle is this
+                topmost = np.array(t[t[:,:,1].argmin()][0])
+                g_bottom = np.array(g1[g1[:,:,1].argmax()][0])
+                g_top = np.array(g2[g2[:,:,1].argmin()][0])
+                bottommost = np.array(t[t[:,:,1].argmax()][0])
+
+                e1 = (topmost + g_bottom) / 2
+                e2 = (bottommost + g_top) / 2
+            else:
+                g_right = np.array(g2[g2[:,:,0].argmax()][0])
+                g_left = np.array(g1[g1[:,:,0].argmin()][0])
+                leftmost = np.array(t[t[:,:,0].argmin()][0])
+                rightmost = np.array(t[t[:,:,0].argmax()][0])
+                e1 = (leftmost + g_right) / 2
+                e2 = (rightmost + g_left) / 2
+            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), 255)
+        return mask
+
     def _draw_special(self, mask, score_areas, scores):
-        for i,r in enumerate(score_areas):
+        #TODO: Morph erea a bit out.
+        for i in range(len(score_areas)-1):
+            r = score_areas[i]
             print(int(math.floor(i/2)))
-            score = (2+ i%2) * self.red_score[int(math.floor(i/2))]
-            print(score)
+            score = (3- i%2) * self.red_score[int(math.floor(i/2))]
             cv2.drawContours(mask, [r[2]], -1, score, thickness=-1)
+        cv2.drawContours(mask, [score_areas[-1][2]], -1, scores[-1], thickness=-1)
 
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
 
     def _create_score_areas(self, mask):
-        #TODO: describe all areas, assign id for each description
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
         img,contours,hierarchy = cv2.findContours(mask.copy(),cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         print(len(contours))
@@ -67,7 +99,7 @@ class Board:
             #TODO: Make more robust than this
             raise Exception("TOO many score areas identified!!!")
         sorted_contours = []
-        center = None
+        c = None
         for cnt in contours:
             x,y = Utility.get_centroid(cnt)
             x_v = center[0] -x
@@ -76,9 +108,9 @@ class Board:
             if math.sqrt(dist) > 10:
                 sorted_contours.append((math.atan2(y_v,x_v),dist , cnt))
             else:
-                center = (math.atan2(y_v,x_v),dist , cnt)
-        sorted_contours.sort(key=lambda k: (k[0], k[1]))
-        sorted_contours.append(center)
+                c = (math.atan2(y_v,x_v),dist , cnt)
+        sorted_contours.sort(key=lambda k: (round(k[0], 1), k[1]))
+        sorted_contours.append(c)
         return sorted_contours
 
     def _angle(self, a1, a2):
