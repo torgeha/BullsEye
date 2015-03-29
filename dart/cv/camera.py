@@ -1,6 +1,8 @@
 
 import cv2
 import time
+import threading
+from Queue import Queue
 
 from framediff import classify_change
 
@@ -12,18 +14,22 @@ class Camera:
         # fps_limit --> the fps the feed should read frames
         # fps_eval --> the fps frames should be evaluated
 
+        self.buffer = CameraBuffer(cam_interface, vid_src_path)
         self.fps_limit = fps_limit
         self.fps_eval = fps_eval
         self.fps_fraction = self.fps_limit / self.fps_eval
 
-        self.cap = cv2.VideoCapture(cam_interface)
+        # self.cap = cv2.VideoCapture(cam_interface)
 
-        if vid_src_path:
-            self.cap = cv2.VideoCapture(vid_src_path)
+        # if vid_src_path:
+        #     self.cap = cv2.VideoCapture(vid_src_path)
 
         self.should_display = should_display
 
-        ret, frame = self.cap.read()
+        # ret, frame = self.cap.read()
+        if self.buffer.buffer.empty():
+            time.sleep(0.5)
+        frame = self.buffer.get_frame()
         self.width = len(frame[0])
         self.height = len(frame)
         self.nof_pixels = self.width * self.height
@@ -36,7 +42,8 @@ class Camera:
 
     def capture(self):
 
-        ret, base_frame = self.cap.read()
+        # ret, base_frame = self.cap.read()
+        base_frame = self.buffer.get_frame()
         last_frame = base_frame
         base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
         last_frame_gray = base_frame_gray
@@ -54,33 +61,35 @@ class Camera:
 
         while (True):
             # Sleep management. Limit fps.
-            target_time += loop_delta
-            sleep_time = target_time - time.clock()
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-                pass
+            # target_time += loop_delta
+            # sleep_time = target_time - time.clock()
+            # if sleep_time > 0:
+            #     time.sleep(sleep_time)
+
 
             # Loop frequency evaluation, prints actual fps
             # previous_time, current_time = current_time, time.clock()
             # time_delta = current_time - previous_time
             # print 'frequency: %s' % (1. / time_delta)
 
-            ret, new_frame = self.cap.read()
-            if not ret:
+            # ret, new_frame = self.cap.read()
+            new_frame = self.buffer.get_frame()
+            if new_frame == None:
+                print "END OF VIDEO, BREAKING"
                 break # no more frames to read
 
             # Continue if frame should not be evaluated
-            loop_count += 1
-            if loop_count <= self.fps_fraction:
-                continue
-            loop_count = 0
+            # loop_count += 1
+            # if loop_count <= self.fps_fraction:
+            #     continue
+            # loop_count = 0
 
             print "lfc", last_frame_changed
             print "lfa", last_frame_arrow
 
             # Display video feed?
-            if self.should_display:
-                cv2.imshow('Feed', new_frame)
+            # if self.should_display:
+            #     cv2.imshow('Feed', new_frame)
 
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
 
@@ -90,6 +99,9 @@ class Camera:
             change_percent, change = classify_change(last_frame_gray, new_frame_gray, percent_threshold, self.max_change)
 
             print "change: ", change_percent, " value: ", change
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
             if change == 0: # Nothing changed, continue
                 if last_frame_changed:
@@ -102,6 +114,9 @@ class Camera:
                 elif last_frame_arrow:
                     # Arrow detected in last frame, now stable, find location
                     # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
+                    frame_with_arrow = last_frame
+                    cv2.imshow("arrow", frame_with_arrow)
+
                     # Set last_frame_arrow = False
                     last_frame_arrow = False
                 continue
@@ -116,15 +131,97 @@ class Camera:
             last_frame_gray = new_frame_gray
 
             # Quit if "q" is pressed
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            # target_time += loop_delta
+            # sleep_time = target_time - time.clock()
+            # print "-------------------------------------------------------------"
+            # print sleep_time
+            # if sleep_time <= 0:
+            #     sleep_time = 1
+
+        cv2.destroyAllWindows()
+
+class CameraBuffer:
+    # TODO: run in own thread??
+
+    def __init__(self, interface, path=None):
+        """
+        Interface --> live video
+        path --> path to file
+        """
+        self.live = False
+        if path == None:
+            self.live = True
+        self.video = cv2.VideoCapture(interface)
+        if path:
+            self.video = cv2.VideoCapture(path)
+
+        self.buffer = Queue(1000)
+        if not self.live:
+            t = threading.Thread(target=self._capture)
+            t.daemon = True
+            t.start()
+            # self._capture() # This should be in own thread!!
+
+    def _capture(self):
+        ret, frame = self.video.read()
+        while ret:
+            self.buffer.put(frame)
+            ret, frame = self.video.read()
+        self.video.release()
+
+    def get_frame(self, delay=None):
+        if self.live:
+            ret, frame = self.video.read()
+            if ret:
+                return frame
+            return None
+        if not self.buffer.empty():
+            return self.buffer.get()
+        return None
+
 
 
 # Testing
 
 path = "C:\Users\Torgeir\Desktop\dartH264"
 
-path = path + "\dart-anglechange.mp4"
+path = path + "\dart2.mp4"
+
+# cap = cv2.VideoCapture(path)
+#
+# while(cap.isOpened()):
+#     ret, frame = cap.read()
+#
+#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#
+#     cv2.imshow('frame',gray)
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# cap.release()
+# cv2.destroyAllWindows()
+
+# b = CameraBuffer(0, path)
+#
+# frame = b.get_frame()
+# # print frame
+#
+# loop_delta = 1./25
+# current_time = target_time = time.clock()
+# while frame != None:
+#     target_time += loop_delta
+#     sleep_time = target_time - time.clock()
+#     if sleep_time > 0:
+#         time.sleep(sleep_time)
+#     print "frame"
+#     cv2.imshow("frame", frame)
+#     frame = b.get_frame()
+#
+# cv2.destroyAllWindows()
+
+
+
+
 print path
 
-cam = Camera(0, 25, 5, True, path)
+cam = Camera(2, 25, 5, True)
