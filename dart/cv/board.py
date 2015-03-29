@@ -74,14 +74,14 @@ class Board:
         x,y = Utility.get_centroid(eleven[0])
         return Utility.angle(center, x, y)
 
-    def _create_score_mask(self, size, ellipse, red, green, center, orientations):
+    def _create_score_mask(self, size, ellipse, red, green, center, orientation):
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
         #mask = self._draw_sectors(mask, green, red, center, self.green_score, red=True)
         #mask = self._draw_sectors(mask, red,green, center, self.red_score, red=False)
-        self._draw_special(mask, green, orientations, self.green_score)
-        self._draw_special(mask,red, orientations, self.red_score)
+        self._draw_special(mask, green, self.green_score, orient=orientation)
+        self._draw_special(mask,red, self.red_score, orient=orientation)
         return mask
 
     def _draw_sectors(self, mask, sectors, adjusters, center, score, red=True):
@@ -120,8 +120,7 @@ class Board:
             cv2.fillConvexPoly(mask, np.array([e1, e2, center]), score[int(math.floor(i/2))])
         return mask
 
-    def _draw_special(self, mask, score_areas, scores):
-        #TODO: Morph erea a bit out.
+    def _draw_special(self, mask, score_areas, scores, orient=0):
         for i in range(len(score_areas)-1):
             r = score_areas[i]
             score = (3- i%2) * self.red_score[int(math.floor(i/2))]
