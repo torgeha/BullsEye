@@ -6,6 +6,7 @@ import math
 class Board:
     DEFAULT_RED_SCORES = [10,2,3,7,8,14,12,20, 18, 13, 50]
     DEFAULT_GREEN_SCORES = [6,15,17,19,16,11,9,5,1,4, 25]
+    NR_COLORED_SEGMENTS = 21
 
     def __init__(self, red_score=DEFAULT_RED_SCORES, green_score=DEFAULT_GREEN_SCORES):
         self.green_limit = 60
@@ -24,38 +25,45 @@ class Board:
         red_mask, green_mask = self._color_difference_segmentation(blurred)
         red_scores = self._create_score_areas(red_mask)
         green_scores = self._create_score_areas(green_mask)
+        if not self._is_valid(red_scores, green_scores):
+            #TODO: error handling. Remove or fix stuff
+            return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
         cv2.ellipse(grid, ellipse, (0,0,255))
         center = self._identify_bullseye(red_scores)
         red_id = self._id_contours(red_scores,center)
         green_id = self._id_contours(green_scores, center)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center)
-        #cv2.drawContours(mask, id[6][2], -1, 200, thickness=-1)
-        cv2.imshow("mask", mask)
-        cv2.waitKey(-1)
-        cv2.destroyAllWindows()
-        return center, ellipse, red_scores, green_scores
+        return center, ellipse, mask
 
+    def _is_valid(self, red_scores, green_scores):
+        return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
 
     def _create_score_mask(self, size, ellipse, red, green, center):
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, red,green, center)
+        mask = self._draw_sectors(mask, green, red, center, self.green_score, red=True)
+        mask = self._draw_sectors(mask, red,green, center, self.red_score, red=False)
         self._draw_special(mask, green, self.green_score)
         self._draw_special(mask,red, self.red_score)
         return mask
 
-    def _draw_sectors(self, mask, red, green, center):
+    def _draw_sectors(self, mask, sectors, adjusters, center, score, red=True):
         '''
         Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
         combined with the center points becomes a sector.
         '''
-        for i in range(1,len(red)-1, 2):
-            t = red[i][2]
-            g1 = green[i][2]
-            g2 = green[(i+2)%(len(red)-1)][2]
-            v =  red[i][0]
+        previous = 0
+        next = 2
+        if red:
+            previous = -2
+            next = 0
+        for i in range(1,len(sectors)-1, 2):
+            t = sectors[i][2]
+            g1 = adjusters[(i+previous)%(len(sectors)-1)][2]
+            g2 = adjusters[(i+next)%(len(sectors)-1)][2]
+            v =  sectors[i][0]
 
             if  v> 2.5 or v<-2.0 or (v>-0.5 and v<1.2):
                 #If angle is v, means top and bottom extreme points has to be used as e1 and e2
@@ -74,18 +82,15 @@ class Board:
                 rightmost = np.array(t[t[:,:,0].argmax()][0])
                 e1 = (leftmost + g_right) / 2
                 e2 = (rightmost + g_left) / 2
-            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), self.red_score[int(math.floor(i/2))])
+            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), score[int(math.floor(i/2))])
         return mask
 
     def _draw_special(self, mask, score_areas, scores):
         #TODO: Morph erea a bit out.
         for i in range(len(score_areas)-1):
             r = score_areas[i]
-            print(int(math.floor(i/2)))
             score = (3- i%2) * self.red_score[int(math.floor(i/2))]
             cv2.drawContours(mask, [r[2]], -1, score, thickness=-1)
-            #cv2.imshow("t", mask)
-            #cv2.waitKey(-1)
         cv2.drawContours(mask, [score_areas[-1][2]], -1, scores[-1], thickness=-1)
 
     def _extract_edges(self, image):
@@ -117,8 +122,6 @@ class Board:
         return sorted_contours
 
     def _angle(self, a1, a2):
-        print(a1)
-        print(a2)
         return np.arccos((a1 * a2) / (np.abs(a1) * np.abs(a2)))
 
     def _identify_bullseye(self, descriptions):
