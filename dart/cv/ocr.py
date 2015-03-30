@@ -12,35 +12,35 @@ class DartLearner:
         if samples and responses:
             self.train(samples, responses)
 
-        def train(self, samples, responses):
-            self.model.train(samples, responses) #TODO: Change
-            return self.model
+    def train(self, samples, responses):
+        self.model.train(samples, responses) #TODO: Change
+        return self.model
 
-        def init_trained_model(data):
-            #TODO: Should be a way to pre train the model for to avoid online learning
-            pass
+    def init_trained_model(self, data):
+        #TODO: Should be a way to pre train the model for to avoid online learning
+        pass
 
-        def test(image):
-            #Let model classify training example
-            mask = self.create_mask(image, ellipse)
-            img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-            groups = self.group_numbers(contours)
-            for n in groups:
-                avg_area = 0
-                a = np.vstack(c[2] for c in n)
-                avg_area =  [cv2.contourArea(c) for c in a]
-                if avg_area >20:
-                    s = np.vstack(x[2] for x in n)
-                    [x,y,w,h] = cv2.boundingRect(s)
-                    if  h>10:
-                        cv2.rectangle(image,(x,y),(x+w,y+h),(0,255,0),2)
-                        roi = mask[y:y+h,x:x+w]
-                        roismall = cv2.resize(roi,(10,10))
-                        roismall = roismall.reshape((1,100))
-                        roismall = np.float32(roismall)
-                        retval, results, neigh_resp, dists = model.find_nearest(roismall, k = 1)
-                        string = str(int((results[0][0])))
-                        cv2.putText(image,string,(x,y+h),0,1,(0,255,0))
+    def test(self, image):
+        #Let model classify training example
+        mask = DartLearner.create_mask(image, ellipse)
+        img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        groups = DartHelper.group_numbers(contours)
+        for n in groups:
+            avg_area = 0
+            a = np.vstack(c[2] for c in n)
+            avg_area =  [cv2.contourArea(c) for c in a]
+            if avg_area >20:
+                s = np.vstack(x[2] for x in n)
+                [x,y,w,h] = cv2.boundingRect(s)
+                if  h>10:
+                    cv2.rectangle(image,(x,y),(x+w,y+h),(0,255,0),2)
+                    roi = mask[y:y+h,x:x+w]
+                    roismall = cv2.resize(roi,(10,10))
+                    roismall = roismall.reshape((1,100))
+                    roismall = np.float32(roismall)
+                    retval, results, neigh_resp, dists = self.model.find_nearest(roismall, k = 1)
+                    string = str(int((results[0][0])))
+                    cv2.putText(image,string,(x,y+h),0,1,(0,255,0))
 class DartHelper:
     WIDE_FACTOR = 1.25
 
@@ -143,28 +143,19 @@ class DartTrainingDataCreator:
 
 
 
+train = True
 
-
-learner = DartTrainingDataCreator()
-b = Board()
-t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard.png"
-img = cv2.imread(t, 1)
-#cap = cv2.VideoCapture("C:\Users\Olav\Desktop\dart2.mp4")
-learnering_cycles = 10
-i = 0
-#TODO: Image loader
-while( i < 1):
+if train:
+    learner = DartTrainingDataCreator()
+    b = Board()
+    t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard.png"
+    img = cv2.imread(t, 1)
     ellipse = b.detect_ellipse(img)
     samples, responses = learner.sample(img, ellipse)
-
+else:
     samples = np.loadtxt('generalsamples.data',np.float32)
     responses = np.loadtxt('generalresponses.data',np.float32)
     responses = responses.reshape((responses.size,1))
-    model = learner.train(samples, responses)
-    learner.test(model, img)
-    i += 1
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-#cap.release()
-#cv2.destroyAllWindows()
+    learner = DartLearner()
+    learner.train(samples, responses)
+    learner.test() #TODO: img
