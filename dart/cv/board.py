@@ -78,49 +78,29 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, green[0], red[0], center, self.green_score, red=True)
-        mask = self._draw_sectors(mask, red[0],green[0], center, self.red_score, red=False)
+        mask = self._draw_sectors(mask, green[0], center, self.green_score)
+        mask = self._draw_sectors(mask, red[0], center, self.red_score)
         self._draw_special(mask, green, self.green_score, orient=orientation)
         self._draw_special(mask,red, self.red_score, orient=orientation)
         return mask
 
-    def _draw_sectors(self, mask, sectors, adjusters, center, score, red=True):
+    def _draw_sectors(self, mask, sectors, center, score):
         '''
         Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
         combined with the center points becomes a sector.
         '''
-        previous = 0
-        next = 1
-        if red:
-            previous = -1
-            next = 0
-        for i in range(1,len(sectors)-1):
+
+        for i in range(len(sectors)):
             t = sectors[i][2]
-            g1 = adjusters[(i+previous)%(len(sectors)-1)][2]
-            g2 = adjusters[(i+next)%(len(sectors)-1)][2]
             v =  sectors[i][0]
-
-            if  v> 2.5 or v<-2.0 or (v>-0.5 and v<1.2):
-                #If angle is v, means top and bottom extreme points has to be used as e1 and e2
-                topmost = np.array(t[t[:,:,1].argmin()][0])
-                g_bottom = np.array(g1[g1[:,:,1].argmax()][0])
-                g_top = np.array(g2[g2[:,:,1].argmin()][0])
-                bottommost = np.array(t[t[:,:,1].argmax()][0])
-
-                e1 = (topmost + g_bottom) / 2
-                e2 = (bottommost + g_top) / 2
-            else:
-                #If not angle fit the if statement, left and right extreme points has to be used as e1, and e2
-                g_right = np.array(g2[g2[:,:,0].argmax()][0])
-                g_left = np.array(g1[g1[:,:,0].argmin()][0])
-                leftmost = np.array(t[t[:,:,0].argmin()][0])
-                rightmost = np.array(t[t[:,:,0].argmax()][0])
-                e1 = (leftmost + g_right) / 2
-                e2 = (rightmost + g_left) / 2
-            cv2.drawContours(mask, sectors[i][2], -1, 255, thickness=1)
-            cv2.imshow("dfg", mask)
-            cv2.waitKey(-1)
-            cv2.fillConvexPoly(mask, np.array([e1, e2, center]), score[int(math.floor(i/2))])
+            #TODO: Avoid convexHUll?
+            #Use orientation somehow?
+            rect = cv2.minAreaRect(t)
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            box = np.vstack([box, center])
+            box = cv2.convexHull(box)
+            cv2.fillConvexPoly(mask, box, score[int(math.floor(i/2))])
         return mask
 
     def _draw_special(self, mask, score_areas, scores, orient=0):
@@ -155,10 +135,12 @@ class Board:
             x,y = Utility.get_centroid(cnt)
             x_v = center[0] -x
             y_v = center[1] - y
+
             dist = math.sqrt(x_v**2+ y_v**2)
             a = Utility.angle(center, x, y)
             if dist > 130:
                 #TODO: ellipse radius
+
                 outer_area.append((a,dist , cnt ))
             elif dist > 10:
                 inner_area.append((a,dist,cnt))
