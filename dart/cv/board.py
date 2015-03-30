@@ -29,17 +29,18 @@ class Board:
             #TODO: error handling. Remove or fix stuff
             return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
+        #short_ellipse = Utility.scale_ellipse(ellipse, .75)
+        #cv2.ellipse(blurred, short_ellipse, (255, 0 ,0 ))
+        #cv2.ellipse(blurred, ellipse, (255, 0 ,0 ))
+        #cv2.drawContours(blurred, green_scores, -1, (0, 255,0), 1)
+        #cv2.imshow("nu",blurred)
+        #cv2.waitKey(-1)
         center = self._identify_bullseye(red_scores, ellipse)
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
-        center = (int(ellipse[0][0]), int(ellipse[0][1]))
-        cv2.circle(blurred, center, 5, (255, 0,0), 1)
-        cv2.drawContours(blurred, green_scores, -1, (0, 255,0), 1)
-        cv2.imshow("nu",blurred)
-        cv2.waitKey(-1)
 
-        red_id = self._id_contours(red_scores,center, ellipse)
-        green_id = self._id_contours(green_scores, center, ellipse)
+        red_id = self._id_contours(red_scores,center, ellipse, blurred)
+        green_id = self._id_contours(green_scores, center, ellipse, blurred)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
         return center, ellipse, mask
 
@@ -52,7 +53,7 @@ class Board:
         #Camera is the right way
         number_mask = self._outline_segmentation(blurred)
         number_mask = cv2.ellipse(number_mask, ellipse, (0,0,0), thickness=-1)
-        wide_ellipse = (ellipse[0], (ellipse[1][0]*1.25,ellipse[1][1]*1.25) , ellipse[2])
+        wide_ellipse = Utility.scale_ellipse(ellipse, 1.25)
         mask = np.zeros(number_mask.shape, np.uint8)
 
         cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
@@ -134,13 +135,13 @@ class Board:
         print(len(contours))
         return contours
 
-    def _id_contours(self, contours, center, ellipse):
+    def _id_contours(self, contours, center, ellipse, blurred):
         if(len(contours)>22):
             #TODO: Make more robust than this
             raise Exception("TOO many score areas identified!!!")
         outer_area = []
         inner_area = []
-
+        short_ellipse = Utility.scale_ellipse(ellipse, 0.75)
         c = None
         for cnt in contours:
             x,y = Utility.get_centroid(cnt)
@@ -148,18 +149,16 @@ class Board:
             y_v = center[1] - y
 
             dist = math.sqrt(x_v**2+ y_v**2)
+            inside = Utility.inside_ellipse((x,y), short_ellipse)
             a = Utility.angle(center, x, y)
-            if dist > 130:
-                #TODO: ellipse radius
-
+            if not inside:
                 outer_area.append((a,dist , cnt ))
-            elif dist > 10:
+            elif inside and dist > 10:
                 inner_area.append((a,dist,cnt))
             else:
                 c = (a,dist , cnt)
         outer_area.sort(key=lambda k: k[0])
         inner_area.sort(key=lambda k: k[0])
-
         return (outer_area, inner_area, c)
 
 

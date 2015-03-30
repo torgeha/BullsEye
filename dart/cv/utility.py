@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import math
 
+
 class Utility:
 
     @staticmethod
@@ -55,6 +56,24 @@ class Utility:
         mask = cv2.dilate(mask, kernel, iterations=1)
         return mask
 
+    @staticmethod
+    def inside_ellipse(point, ellipse):
+        px, py = point
+        h, k = ellipse[0]
+        rx, ry = ellipse[1]
+        angle = ellipse[2]
+        x, y =np.dot(np.array([px-h, py-k]), Utility.rot_matrix(-angle))
+        a = rx * 0.5
+        b = ry * 0.5
+        return (x**2/a**2) + (y**2/b**2) <= 1
+
+    @staticmethod
+    def rot_matrix(theta):
+        return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]]);
+    @staticmethod
+    def scale_ellipse(ellipse, factor):
+        #ellipse = ((center),(width,height of bounding rect), angle)
+        return (ellipse[0], (ellipse[1][0]*factor,ellipse[1][1]*factor) , ellipse[2])
     @staticmethod
     def angle( center, x,y):
         return math.atan2(center[0]-x, center[1]-y)
