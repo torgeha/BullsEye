@@ -7,13 +7,21 @@ class Board:
     RED_SCORES = [2, 10,13,18,20,12,14,8,7,3 ,50]
     GREEN_SCORES = [17,15,6,4,1,5,9,11,16,19, 25]
     NR_COLORED_SEGMENTS = 21
-    RED_LIMIT = 55
-    GREEN_LIMIT = 55
+    RED_LIMIT = 60
+    GREEN_LIMIT = 60
     def __init__(self, red_score=RED_SCORES, green_score=GREEN_SCORES, green_limit=GREEN_LIMIT, red_limit=RED_LIMIT):
         self.green_limit = green_limit
         self.red_limit = red_limit
         self.red_score = red_score
         self.green_score = green_score
+
+    def detect_ellipse(self, image):
+        blurred = cv2.GaussianBlur(image,(5,5),0)
+        red_mask, green_mask = self._color_difference_segmentation(blurred)
+        red_scores = self._create_description_areas(red_mask)
+        green_scores = self._create_description_areas(green_mask)
+        ellipse, approx_hull = self._fit_ellipse(red_scores)
+        return ellipse
 
     def detect(self, image):
         '''
@@ -35,7 +43,7 @@ class Board:
         center = self._identify_bullseye(red_scores, ellipse)
         orientation = 0
         #orientation = self._orientation(blurred, center, ellipse)
-        print(orientation)
+        #print(orientation)
 
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
@@ -114,10 +122,10 @@ class Board:
         outer = score_areas[0]
         inner = score_areas[1]
         center = score_areas[2]
-        print(len(outer))
-        print(len(inner))
+        #len(outer))
+        #print(len(inner))
         for i in range(len(outer)):
-            print("score",2*scores[i])
+            #print("score",2*scores[i])
             cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
         for i in range(len(inner)):
             cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
@@ -132,7 +140,7 @@ class Board:
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         #TODO:Combine close ones, and prune noise outside.
-        print(len(contours))
+        #print(len(contours))
         return contours
 
     def _id_contours(self, contours, center, ellipse, blurred):
