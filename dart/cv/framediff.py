@@ -85,7 +85,14 @@ def find_arrow(base_img, arrow_img):
     cv2.imshow("isolatedArrow", isolated_arrow_img)
 
     # Find coordinates within picture based on isolated arrows
-    x, y = _locate_arrow(isolated_arrow_img)
+    coordinates = _locate_arrow(isolated_arrow_img)
+
+    # TODO: return coordinates here?
+
+
+    # for c in coordinates:
+    #     cv2.circle(arrow_img, c, 2, 255)
+    # cv2.imshow("points", arrow_img)
 
 
 def _isolate_arrows(diff_img):
@@ -136,7 +143,7 @@ def _locate_arrow(bw_img):
     # print MA, ma
     # print angle
 
-    # Find centroid of every cnt and point firthest away from it
+    # Find centroid of every cnt and point furthest away from it
     centers = []
     for cnt in contours:
 
@@ -146,33 +153,55 @@ def _locate_arrow(bw_img):
         centers.append((centroid_x, centroid_y))
         # cv2.circle(bw_img, (centroid_x, centroid_y), 2, 255)
 
-    # TODO: Find the point furthest from centroid!!
-
     # find extreme points
     index = 0
+    coordinates = []
     for cnt in contours:
-        leftmost = tuple(cnt[cnt[:,:,0].argmin()][0])
-        rightmost = tuple(cnt[cnt[:,:,0].argmax()][0])
-        topmost = tuple(cnt[cnt[:,:,1].argmin()][0])
-        bottommost = tuple(cnt[cnt[:,:,1].argmax()][0])
 
-        # cv2.circle(bw_img, leftmost, 2, 255)
+        leftmost = cnt[cnt[:,:,0].argmin()][0]
+        rightmost = cnt[cnt[:,:,0].argmax()][0]
+        topmost = cnt[cnt[:,:,1].argmin()][0]
+        bottommost = cnt[cnt[:,:,1].argmax()][0]
+        centroid = centers[index]
+
+        points = [leftmost, rightmost, topmost, bottommost]
+
+        # Distance from centroid
+        ld = np.linalg.norm(leftmost - centroid)
+        rd = np.linalg.norm(rightmost - centroid)
+        td = np.linalg.norm(topmost - centroid)
+        bd = np.linalg.norm(bottommost - centroid)
+
+        distances = [ld, rd, td, bd]
+        max_index = np.argmax(distances)
+
+        coordinates.append(tuple(points[max_index]))
+
+        # cv2.circle(bw_img, tuple(points[max_index]), 2, 255)
         # cv2.circle(bw_img, rightmost, 2, 255)
         # cv2.circle(bw_img, topmost, 2, 255)
         # cv2.circle(bw_img, bottommost, 2, 255)
 
-        print leftmost, rightmost, topmost, bottommost
-        print centers[index]
+        # print leftmost, rightmost, topmost, bottommost
+        # print centers[index]
+        #
+        # print type(leftmost), leftmost
+        # print type(centers[index]), centers[index]
+        # print type(lt), lt
+        # print type(c), c
 
-        dist = np.linalg.norm(leftmost - centers[index])
+        # dist = np.linalg.norm(lt - c)
+
+        # print dist
 
         index += 1
 
+    print coordinates
 
 
     cv2.imshow("mass", bw_img)
 
-    rows, cols = bw_img.shape[:2]
+    # rows, cols = bw_img.shape[:2]
     # print rows, cols
 
     # loop through contours
@@ -185,7 +214,7 @@ def _locate_arrow(bw_img):
     #
     # cv2.imshow("line", bw_img)
 
-    return 0, 0
+    return coordinates
 
 def _compute_diff(base_img, new_img):
     # Compute diff
