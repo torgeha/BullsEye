@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 import math
+from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 
 class Utility:
 
@@ -12,7 +14,7 @@ class Utility:
 
     @staticmethod
     def remove_bw_noise(noisy_image, kernel=None):
-        if not kernel:
+        if kernel == None:
             kernel = np.ones((3,3),np.uint8)
         erosion = cv2.erode(noisy_image,kernel,iterations = 1)
         dilation = cv2.dilate(erosion,kernel,iterations = 1)
@@ -36,6 +38,13 @@ class Utility:
             return (-1, -1)
 
     @staticmethod
+    def to_degree(angle):
+        angle = angle * 360 / (2*math.pi);
+        if (angle < 0):
+            angle = angle + 360;
+
+
+    @staticmethod
     def get_centroid(cnt):
         M = cv2.moments(cnt)
         div = Utility._div(M['m00'])
@@ -49,6 +58,24 @@ class Utility:
         return mask
 
     @staticmethod
+    def inside_ellipse(point, ellipse):
+        px, py = point
+        h, k = ellipse[0]
+        rx, ry = ellipse[1]
+        angle = ellipse[2]
+        x, y =np.dot(np.array([px-h, py-k]), Utility.rot_matrix(-angle))
+        a = rx * 0.5
+        b = ry * 0.5
+        return (x**2/a**2) + (y**2/b**2) <= 1
+
+    @staticmethod
+    def rot_matrix(theta):
+        return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]]);
+    @staticmethod
+    def scale_ellipse(ellipse, factor):
+        #ellipse = ((center),(width,height of bounding rect), angle)
+        return (ellipse[0], (ellipse[1][0]*factor,ellipse[1][1]*factor) , ellipse[2])
+    @staticmethod
     def angle( center, x,y):
         return math.atan2(center[0]-x, center[1]-y)
 
@@ -57,3 +84,21 @@ class Utility:
         if moment == 0:
             return 0.00001
         return moment
+
+    @staticmethod
+    def show_value_plot(image):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.imshow(image, cmap=cm.jet, interpolation='nearest')
+        numrows, numcols = image.shape
+        def format_coord(x, y):
+            col = int(x+0.5)
+            row = int(y+0.5)
+            if col>=0 and col<numcols and row>=0 and row<numrows:
+                z = image[row,col]
+                return 'x=%1.4f, y=%1.4f, z=%1.4f'%(x, y, z)
+            else:
+                return 'x=%1.4f, y=%1.4f'%(x, y)
+
+        ax.format_coord = format_coord
+        plt.show()
