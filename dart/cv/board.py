@@ -29,9 +29,15 @@ class Board:
             #TODO: error handling. Remove or fix stuff
             return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
-        center = self._identify_bullseye(red_scores)
+        center = self._identify_bullseye(red_scores, ellipse)
         orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
+        center = (int(ellipse[0][0]), int(ellipse[0][1]))
+        cv2.circle(blurred, center, 5, (255, 0,0), 1)
+        cv2.drawContours(blurred, green_scores, -1, (0, 255,0), 1)
+        cv2.imshow("nu",blurred)
+        cv2.waitKey(-1)
+
         red_id = self._id_contours(red_scores,center, ellipse)
         green_id = self._id_contours(green_scores, center, ellipse)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
@@ -46,12 +52,13 @@ class Board:
         #Camera is the right way
         number_mask = self._outline_segmentation(blurred)
         number_mask = cv2.ellipse(number_mask, ellipse, (0,0,0), thickness=-1)
-        wide_ellipse = (ellipse[0], (ellipse[1][0]*1.29,ellipse[1][1]*1.29) , ellipse[2])
+        wide_ellipse = (ellipse[0], (ellipse[1][0]*1.25,ellipse[1][1]*1.25) , ellipse[2])
         mask = np.zeros(number_mask.shape, np.uint8)
 
         cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
         number_mask = cv2.multiply(number_mask, mask)
         number_mask = cv2.erode(number_mask,  np.ones((2,2),np.uint8))
+
         img,contours,hierarchy = cv2.findContours(number_mask,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         children = []
         w = wide_ellipse[1][0]-ellipse[1][0]
@@ -89,7 +96,6 @@ class Board:
         Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
         combined with the center points becomes a sector.
         '''
-
         for i in range(len(sectors)):
             t = sectors[i][2]
             v =  sectors[i][0]
@@ -107,10 +113,12 @@ class Board:
         outer = score_areas[0]
         inner = score_areas[1]
         center = score_areas[2]
-
+        print(len(outer))
+        print(len(inner))
         for i in range(len(outer)):
             cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
         for i in range(len(inner)):
+
             cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
         cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
 
@@ -118,8 +126,11 @@ class Board:
         return cv2.Canny(image,100,200)
 
     def _create_description_areas(self, mask):
+        #TODO: better way of combining
+        mask = Utility.expand(mask)
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        #TODO:Combine close ones
         print(len(contours))
         return contours
 
@@ -152,9 +163,12 @@ class Board:
         return (outer_area, inner_area, c)
 
 
-    def _identify_bullseye(self, descriptions):
-        #TODO: MAKE MORE ROBUST. AVG_pos not that great!
-        avg_x, avg_y = Utility.get_avg_pos(descriptions)
+    def _identify_bullseye(self, descriptions, ellipse):
+
+        #avg_x, avg_y = Utility.get_avg_pos(descriptions)
+        #Center of ellipse might be some off the true center.
+        #Find contour that match center best and return it
+        avg_x, avg_y = ellipse[0]
         min_dist = float("inf")
         center = None
 

@@ -12,7 +12,7 @@ class Utility:
 
     @staticmethod
     def remove_bw_noise(noisy_image, kernel=None):
-        if not kernel:
+        if kernel == None:
             kernel = np.ones((3,3),np.uint8)
         erosion = cv2.erode(noisy_image,kernel,iterations = 1)
         dilation = cv2.dilate(erosion,kernel,iterations = 1)
