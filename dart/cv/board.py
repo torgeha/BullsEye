@@ -4,13 +4,14 @@ from utility import Utility
 import math
 
 class Board:
-    DEFAULT_RED_SCORES = [10,2,3,7,8,14,12,20, 18, 13, 50]
-    DEFAULT_GREEN_SCORES = [6,15,17,19,16,11,9,5,1,4, 25]
+    RED_SCORES = [2, 10,13,18,20,12,14,8,7,3 ,50]
+    GREEN_SCORES = [17,15,6,4,1,5,9,11,16,19, 25]
     NR_COLORED_SEGMENTS = 21
-
-    def __init__(self, red_score=DEFAULT_RED_SCORES, green_score=DEFAULT_GREEN_SCORES):
-        self.green_limit = 60
-        self.red_limit = 60
+    RED_LIMIT = 55
+    GREEN_LIMIT = 55
+    def __init__(self, red_score=RED_SCORES, green_score=GREEN_SCORES, green_limit=GREEN_LIMIT, red_limit=RED_LIMIT):
+        self.green_limit = green_limit
+        self.red_limit = red_limit
         self.red_score = red_score
         self.green_score = green_score
 
@@ -25,18 +26,15 @@ class Board:
         red_mask, green_mask = self._color_difference_segmentation(blurred)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
-        if not self._is_valid(red_scores, green_scores):
-            #TODO: error handling. Remove or fix stuff
-            return None, None, None
+
+
+        #if not self._is_valid(red_scores, green_scores):
+        #    #TODO: error handling. Remove or fix stuff
+        #    return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
-        #short_ellipse = Utility.scale_ellipse(ellipse, .75)
-        #cv2.ellipse(blurred, short_ellipse, (255, 0 ,0 ))
-        #cv2.ellipse(blurred, ellipse, (255, 0 ,0 ))
-        #cv2.drawContours(blurred, green_scores, -1, (0, 255,0), 1)
-        #cv2.imshow("nu",blurred)
-        #cv2.waitKey(-1)
         center = self._identify_bullseye(red_scores, ellipse)
-        orientation = self._orientation(blurred, center, ellipse)
+        orientation = 0
+        #orientation = self._orientation(blurred, center, ellipse)
         print(orientation)
 
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
@@ -107,7 +105,9 @@ class Board:
             box = np.int0(box)
             box = np.vstack([box, center])
             box = cv2.convexHull(box)
-            cv2.fillConvexPoly(mask, box, score[int(math.floor(i/2))])
+            cv2.fillConvexPoly(mask, box, score[i])
+
+
         return mask
 
     def _draw_special(self, mask, score_areas, scores, orient=0):
@@ -117,9 +117,9 @@ class Board:
         print(len(outer))
         print(len(inner))
         for i in range(len(outer)):
+            print("score",2*scores[i])
             cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
         for i in range(len(inner)):
-
             cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
         cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
 
@@ -131,7 +131,7 @@ class Board:
         mask = Utility.expand(mask)
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        #TODO:Combine close ones
+        #TODO:Combine close ones, and prune noise outside.
         print(len(contours))
         return contours
 
@@ -200,9 +200,11 @@ class Board:
         green = Utility.convert_to_cv(green)
 
         #Remove noise
-        red = Utility.remove_bw_noise(red)
+
+        kernel = np.ones((3,3), np.uint8)
+        red = Utility.remove_bw_noise(red, kernel=kernel)
         red = Utility.expand(red)
-        green = Utility.remove_bw_noise(green)
+        green = Utility.remove_bw_noise(green, kernel=kernel)
         green = Utility.expand(green)
         return red, green
 

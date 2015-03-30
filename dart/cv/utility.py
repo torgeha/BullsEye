@@ -1,7 +1,8 @@
 import numpy as np
 import cv2
 import math
-
+from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 
 class Utility:
 
@@ -83,3 +84,21 @@ class Utility:
         if moment == 0:
             return 0.00001
         return moment
+
+    @staticmethod
+    def show_value_plot(image):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.imshow(image, cmap=cm.jet, interpolation='nearest')
+        numrows, numcols = image.shape
+        def format_coord(x, y):
+            col = int(x+0.5)
+            row = int(y+0.5)
+            if col>=0 and col<numcols and row>=0 and row<numrows:
+                z = image[row,col]
+                return 'x=%1.4f, y=%1.4f, z=%1.4f'%(x, y, z)
+            else:
+                return 'x=%1.4f, y=%1.4f'%(x, y)
+
+        ax.format_coord = format_coord
+        plt.show()
