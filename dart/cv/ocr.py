@@ -4,8 +4,6 @@ import scipy
 from utility import Utility
 from board import Board
 import math
-import sys
-print(np.__version__)
 from sklearn import neighbors
 class DartLearner:
 
@@ -13,6 +11,10 @@ class DartLearner:
         self.number = 20
         self.model = neighbors.KNeighborsClassifier(self.number, weights='distance')
         if samples and responses:
+            if isinstance(samples, basestring):
+                samples = np.loadtxt(samples,np.float32)
+            if isinstance(responses, basestring):
+                responses = np.loadtxt(responses,np.float32)
             self.train(samples, responses)
 
     def train(self, samples, targets):
@@ -23,23 +25,32 @@ class DartLearner:
         #TODO: Should be a way to pre train the model for to avoid online learning
         pass
 
+    def classify(self, roi):
+        return self.model.predict(roi)
+
+    def classify_all(self, mask, groups):
+        classifications = []
+        for n in groups:
+            avg_area, points, rect = DartHelper.get_group_description(n)
+            [x,y,w,h] = rect
+            if avg_area >20 and h>4:
+                roi = DartHelper.create_roi(mask, [x,y,w,h])
+                roi = DartHelper.reshape_roi(roi)
+                result = self.model.predict(roi)
+                classifications.append(int((result)))
+            else:
+                classifications.append(-1)
+        return classifications
+
     def test(self, image, ellipse):
         #Let model classify training example
         contours, mask, groups = DartHelper.create_number_descriptions(image, ellipse)
-
-        for n in groups:
+        predictions = self.classify_all(mask, groups)
+        for i,n in enumerate(groups):
             avg_area, points, rect = DartHelper.get_group_description(n)
-            if avg_area >20:
-                [x,y,w,h] = rect
-                #print("group", x,y,w,h)
-                if  h>4:
-                    cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),1)
-                    roi = DartHelper.create_roi(mask, [x,y,w,h])
-                    roi = DartHelper.reshape_roi(roi)
-                    result = self.model.predict(roi)
-                    string = str(int((result)))
-                    print(string)
-                    cv2.putText(image,string,(x,y+h),0,1,(20,255,20), thickness=1)
+            [x,y,w,h] = rect
+            cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),1)
+            cv2.putText(image,str(predictions[i]),(x,y+h),0,1,(20,255,20), thickness=1)
         cv2.imshow("Result", image)
         cv2.waitKey(-1)
 
@@ -186,9 +197,9 @@ class DartTrainingDataCreator:
 
 
 
-train = True
+train = False
 
-t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard23.png"
+t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard22.png"
 img = cv2.imread(t, 1)
 b = Board()
 ellipse = b.detect_ellipse(img)
