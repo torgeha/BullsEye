@@ -29,12 +29,9 @@ class DartLearner:
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         groups = DartHelper.group_numbers(contours)
         for n in groups:
-            avg_area = 0
-            a = np.vstack(c[2] for c in n)
-            avg_area =  [cv2.contourArea(c) for c in a]
+            avg_area, points = DartHelper.get_group_description(n)
             if avg_area >20:
-                s = np.vstack(x[2] for x in n)
-                [x,y,w,h] = cv2.boundingRect(s)
+                [x,y,w,h] = cv2.boundingRect(points)
                 if  h>10:
                     cv2.rectangle(image,(x,y),(x+w,y+h),(0,255,0),2)
                     roi = DartHelper.create_roi(mask, [x,y,w,h])
@@ -62,6 +59,11 @@ class DartHelper:
         number_mask = cv2.multiply(number_mask, mask)
         #number_mask = cv2.erode(number_mask,  np.ones((2,2),np.uint8))
         return number_mask
+
+    @staticmethod
+    def get_group_description(group):
+         a = np.vstack(c[2] for c in group)
+         return cv2.contourArea(a), a
 
     @staticmethod
     def group_numbers(contours, max_factor=.5):
@@ -126,35 +128,34 @@ class DartTrainingDataCreator:
         np.savetxt(file_handle,data)
         file_handle.close()
 
+    def request_target_from_user(self, image, roi):
+        [x,y,w,h] = roi
+        cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
+        cv2.imshow('Press enter when finished',image)
+        entered_keys = []
+        while True:
+            key = cv2.waitKey(0)
+            if  key is DartTrainingDataCreator.ENTER:
+                break
+            entered_keys.append(key)
+        return entered_keys
+
     def get_numbers(self, groups, mask, image):
         samples =  np.empty((0,100))
         responses = []
         for n in groups:
-            avg_area = 0
             keys = [i for i in range(48,58)]
             entered_keys = []
-            roi = None
-            a = np.vstack(c[2] for c in n)
-            avg_area =  [cv2.contourArea(c) for c in a]
+            avg_area, points =  DartHelper.get_group_description(n)
             if avg_area >20:
-                s = np.vstack(x[2] for x in n)
-                [x,y,w,h] = cv2.boundingRect(s)
+                [x,y,w,h]= bounding_box = cv2.boundingRect(points)
                 if  h>10:
-                    cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),2)
-                    cv2.imshow('norm',image)
-
-                    while True:
-                        key = cv2.waitKey(0)
-                        if  key is DartTrainingDataCreator.ENTER:
-                            break
-                        entered_keys.append(key)
-
+                    entered_keys = self.request_target_from_user(image, bounding_box)
                 if len(entered_keys)>0 and (k in keys for k in entered_keys):
                     n = int(''.join(map(chr, entered_keys)))
                     responses.append(n)
-                    roi = DartHelper.create_roi(mask, [x,y,w,h])
+                    roi = DartHelper.create_roi(mask, bounding_box)
                     sample = DartHelper.reshape_roi(roi)
-                    print(len(sample))
                     samples = np.append(samples,sample,0)
                     print(responses)
         responses = np.array(responses,np.float32)
