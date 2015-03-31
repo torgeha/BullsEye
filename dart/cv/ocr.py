@@ -25,11 +25,7 @@ class DartLearner:
 
     def test(self, image, ellipse):
         #Let model classify training example
-        mask = DartHelper.create_mask(image, ellipse)
-        img,contours,hierarchy = cv2.findContours(mask.copy(),cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        cv2.drawContours(image, contours, -1, (0,255,255), thickness=-1)
-        cv2.imshow("contours", image)
-        groups = DartHelper.group_numbers(contours, ellipse)
+        contours, mask, groups = DartHelper.create_number_descriptions(image, ellipse)
 
         for n in groups:
             avg_area, points, rect = DartHelper.get_group_description(n)
@@ -51,6 +47,13 @@ class DartLearner:
 class DartHelper:
     WIDE_FACTOR = 1.25
 
+    @staticmethod
+    def create_number_descriptions(image, ellipse):
+        mask = DartHelper.create_mask(image, ellipse)
+        img,contours,hierarchy = cv2.findContours(mask.copy(),cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(image, contours, -1, (0,255,255), thickness=-1)
+        groups = DartHelper.group_numbers(contours, ellipse)
+        return contours, mask, groups
 
     @staticmethod
     def create_mask(image, ellipse):
@@ -133,9 +136,7 @@ class DartTrainingDataCreator:
     ESCAPE = 27
 
     def sample(self, image, ellipse, sample_file=SAMPLE_FILENAME, response_file=RESPONSE_FILENAME):
-        mask = DartHelper.create_mask(image, ellipse)
-        img,contours,hierarchy = cv2.findContours(mask.copy(),cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        groups = DartHelper.group_numbers(contours, ellipse)
+        contours, mask, groups = DartHelper.create_number_descriptions(image, ellipse)
         samples, responses = self.get_numbers(groups, mask, image)
         self.append_to_file(samples, sample_file)
         self.append_to_file(responses, response_file)
