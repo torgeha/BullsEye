@@ -3,8 +3,10 @@ import cv2
 import math
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+from collections import deque
 
 class Utility:
+    SCORES = deque([17,2,15,10,6,13,4,18,1,20,5,12,9,14,11,8,16,7,19,3])
 
     @staticmethod
     def convert_to_cv(normalized_matrix):
@@ -42,6 +44,32 @@ class Utility:
         angle = angle * 360 / (2*math.pi);
         if (angle < 0):
             angle = angle + 360;
+
+    @staticmethod
+    def classification_error_correction(center, classifications):
+        #Will sort based on proximity
+        #Ensure that there are only 20 objects
+        #Error correct based on order
+        if len(classifications) != 20:
+            print("DAMN")
+            raise Exception("NOT 20")
+        s = sorted(classifications, key=lambda i: Utility.angle(center, i[0][0], i[0][1]))
+        #TODO: Find most common subsequence in list. Hamming distance etc etc.
+        score = Utility.SCORES
+        max_correct = 0
+        best = 0
+        for i in range(len(score)):
+            correct = sum([p == c[1] for p,c in zip(score, s)])
+            if correct > max_correct:
+                max_correct = correct
+                best = i
+            score.rotate()
+        print(best)
+        for i in range(len(score)):
+            v = score[i+best]
+            s[i] = (s[i][0], v)
+        print(s)
+        return s
 
 
     @staticmethod

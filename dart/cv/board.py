@@ -1,19 +1,27 @@
-import cv2
-import numpy as np
-from utility import Utility
 import math
 
+import cv2
+import numpy as np
+
+from utility import Utility
+from ocr.learner import DartHelper, DartLearner
+
+
 class Board:
+
     RED_SCORES = [2, 10,13,18,20,12,14,8,7,3 ,50]
     GREEN_SCORES = [17,15,6,4,1,5,9,11,16,19, 25]
     NR_COLORED_SEGMENTS = 21
     RED_LIMIT = 60
     GREEN_LIMIT = 60
+
     def __init__(self, red_score=RED_SCORES, green_score=GREEN_SCORES, green_limit=GREEN_LIMIT, red_limit=RED_LIMIT):
+        self.learner = DartLearner(samples=DartLearner.SAMPLE_FILENAME, responses=DartLearner.RESPONSE_FILENAME)
         self.green_limit = green_limit
         self.red_limit = red_limit
         self.red_score = red_score
         self.green_score = green_score
+
 
     def detect_ellipse(self, image):
         blurred = cv2.GaussianBlur(image,(5,5),0)
@@ -41,71 +49,43 @@ class Board:
         #    return None, None, None
         ellipse, approx_hull = self._fit_ellipse(red_scores)
         center = self._identify_bullseye(red_scores, ellipse)
+        #TODO: Default numbering, and ocr numbering
         orientation = 0
-        #orientation = self._orientation(blurred, center, ellipse)
-        #print(orientation)
-
+        contours, number_mask, groups = DartHelper.create_number_descriptions(image, ellipse)
+        predictions = self.learner.classify_all(number_mask, groups)
+        #predictions = self.learner.test(blurred, ellipse)
+        Utility.classification_error_correction(center, predictions)
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
-        mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, orientation)
+        mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, predictions)
         return center, ellipse, mask
 
     def _is_valid(self, red_scores, green_scores):
         return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
 
-
-    def _orientation(self, blurred, center, ellipse):
-        #TODO: Optional orientation measure. Should work without this working. As long as
-        #Camera is the right way
-        number_mask = self._outline_segmentation(blurred)
-        number_mask = cv2.ellipse(number_mask, ellipse, (0,0,0), thickness=-1)
-        wide_ellipse = Utility.scale_ellipse(ellipse, 1.25)
-        mask = np.zeros(number_mask.shape, np.uint8)
-
-        cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
-        number_mask = cv2.multiply(number_mask, mask)
-        number_mask = cv2.erode(number_mask,  np.ones((2,2),np.uint8))
-
-        img,contours,hierarchy = cv2.findContours(number_mask,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-        children = []
-        w = wide_ellipse[1][0]-ellipse[1][0]
-        lowest = float('inf')
-        eleven = None
-        for c in range(len(contours)-1):
-            #TODO: Reduce double calculations
-            c1 = contours[c]
-            c2 = contours[c+1]
-            cc1 = Utility.get_centroid(c1)
-            cc2 = Utility.get_centroid(c2)
-            d = abs(cc1[0] - cc2[0]) + abs(cc1[1] - cc2[1])
-            m1 = (cv2.contourArea(c1)/cv2.arcLength(c1, True))
-            m2 = (cv2.contourArea(c2)/cv2.arcLength(c2, True))
-
-            if d < w and m1 + m2< lowest:
-                #TODO: less than 30 not robust!!
-                lowest = m1 + m2
-                eleven = c1, c2
-        x,y = Utility.get_centroid(eleven[0])
-        return Utility.angle(center, x, y)
-
-    def _create_score_mask(self, size, ellipse, red, green, center, orientation):
+    def _create_score_mask(self, size, ellipse, red, green, center, predictions):
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, green[0], center, self.green_score)
-        mask = self._draw_sectors(mask, red[0], center, self.red_score)
-        self._draw_special(mask, green, self.green_score, orient=orientation)
-        self._draw_special(mask,red, self.red_score, orient=orientation)
+        mask = self._draw_sectors(mask, green[0], center, self.green_score, orient=predictions)
+        mask = self._draw_sectors(mask, red[0], center, self.red_score, predictions)
+        self._draw_special(mask, green, self.green_score, orient=predictions)
+        self._draw_special(mask,red, self.red_score, orient=predictions)
         return mask
 
-    def _draw_sectors(self, mask, sectors, center, score):
+    def _draw_sectors(self, mask, sectors, center, score, orient=None):
         '''
         Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
         combined with the center points becomes a sector.
         '''
+        #Score prep using predictions
+        v = []
+        for n in orient:
+            x,y,w,h = n[0]
+            v.append(np.array([center[0]-x, center[1]-y]))
         for i in range(len(sectors)):
             t = sectors[i][2]
-            v =  sectors[i][0]
+            c =  sectors[i][0]
             #TODO: Avoid convexHUll?
             #Use orientation somehow?
             rect = cv2.minAreaRect(t)
@@ -113,11 +93,23 @@ class Board:
             box = np.int0(box)
             box = np.vstack([box, center])
             box = cv2.convexHull(box)
-            cv2.fillConvexPoly(mask, box, score[i])
+            s = self.find_closest(v, np.array([center[0]-rect[0][0], center[1]-rect[0][1]]))
+            print(orient[s][1])
+            cv2.fillConvexPoly(mask, box, orient[s][1])
 
 
         return mask
-
+    #TODO: Put in utility
+    def find_closest(self, v_list, u):
+        #TODO: List comprehension
+        p = float('inf')
+        closest = None
+        for i, v in enumerate(v_list):
+            cross = abs(np.cross(v,u ))
+            if cross < p:
+                closest = i
+                p = cross
+        return closest
     def _draw_special(self, mask, score_areas, scores, orient=0):
         outer = score_areas[0]
         inner = score_areas[1]
