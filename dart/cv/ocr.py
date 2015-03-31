@@ -27,23 +27,29 @@ class DartLearner:
         #Let model classify training example
         mask = DartHelper.create_mask(image, ellipse)
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        groups = DartHelper.group_numbers(contours)
+        cv2.drawContours(image, contours, -1, (0,255,255), thickness=-1)
+        cv2.imshow("contours", image)
+        groups = DartHelper.group_numbers(contours, ellipse)
+        print("LENG",len(groups))
         for n in groups:
             avg_area, points = DartHelper.get_group_description(n)
-            if avg_area >20:
+            if avg_area >7:
                 [x,y,w,h] = cv2.boundingRect(points)
-                if  h>10:
-                    cv2.rectangle(image,(x,y),(x+w,y+h),(0,255,0),2)
+                if  h>5:
+                    cv2.rectangle(image,(x,y),(x+w,y+h),(0,0,255),1)
                     roi = DartHelper.create_roi(mask, [x,y,w,h])
                     roi = DartHelper.reshape_roi(roi)
                     result = self.model.predict(roi)
                     string = str(int((result)))
                     print(string)
-                    cv2.putText(image,string,(x,y+h),0,1,(20,255,20))
+                    cv2.putText(image,string,(x,y+h),0,1,(20,255,20), thickness=1)
         cv2.imshow("Result", image)
         cv2.waitKey(-1)
+
+
 class DartHelper:
     WIDE_FACTOR = 1.25
+
 
     @staticmethod
     def create_mask(image, ellipse):
@@ -52,7 +58,7 @@ class DartHelper:
         ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         number_mask = thresh
         number_mask = cv2.ellipse(number_mask, ellipse, (0,0,0), thickness=-1)
-        wide_ellipse = Utility.scale_ellipse(ellipse, 1.25)
+        wide_ellipse = Utility.scale_ellipse(ellipse, DartHelper.WIDE_FACTOR)
         mask = np.zeros(number_mask.shape, np.uint8)
 
         cv2.ellipse(mask, wide_ellipse, 1, thickness=-1)
@@ -66,10 +72,19 @@ class DartHelper:
          return cv2.contourArea(a), a
 
     @staticmethod
-    def group_numbers(contours, max_factor=.5):
+    def group_numbers(contours,ellipse, max_factor=0.6):
+        #Prune away to big contours, like outline caused by not-fitted ellipse
+        max_w , max_h = ellipse[1][0]*0.1,ellipse[1][1]*0.1
+        for cnt in contours:
+            [x,y,w,h] = cv2.boundingRect(cnt)
+            if max_w<w or max_h<h:
+                print("REMOVE")
+                contours.remove(cnt)
+
         groups = [] #20 groups ideally
         avg_area = 0
         for cnt in contours:
+            print()
             avg_area += cv2.contourArea(cnt)
         avg_area / len(contours) #TODO: or 20?
         max_dist = np.sqrt(avg_area) * max_factor
@@ -79,10 +94,10 @@ class DartHelper:
             for i in range(1, len(contours)):
                 cnt = contours[i]
                 x,y = Utility.get_centroid(cnt)
+                found = False
                 for g in groups:
                     ax, ay = DartHelper.get_avg_group(g)
                     dist = math.sqrt((ax-x)**2 + (ay-y)**2)
-                    found = False
                     if dist < max_dist:
                         found = True
                         g.append((x,y,cnt))
@@ -94,8 +109,8 @@ class DartHelper:
     def create_roi(mask, rectangle, width=10, height=10):
         x,y,w,h = rectangle
         roi = mask[y:y+h,x:x+w]
-        roismall = cv2.resize(roi,(width,height))
-        return roismall
+        roi = cv2.resize(roi,(width,height))
+        return roi
 
     @staticmethod
     def reshape_roi(roi, length=100):
@@ -117,7 +132,7 @@ class DartTrainingDataCreator:
     def sample(self, image, ellipse, sample_file=SAMPLE_FILENAME, response_file=RESPONSE_FILENAME):
         mask = DartHelper.create_mask(image, ellipse)
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        groups = DartHelper.group_numbers(contours)
+        groups = DartHelper.group_numbers(contours, ellipse)
         samples, responses = self.get_numbers(groups, mask, image)
         self.append_to_file(samples, sample_file)
         self.append_to_file(responses, response_file)
@@ -144,20 +159,20 @@ class DartTrainingDataCreator:
         samples =  np.empty((0,100))
         responses = []
         for n in groups:
-            keys = [i for i in range(48,58)]
-            entered_keys = []
             avg_area, points =  DartHelper.get_group_description(n)
             if avg_area >20:
                 [x,y,w,h]= bounding_box = cv2.boundingRect(points)
                 if  h>10:
+                    keys = [i for i in range(48,58)]
                     entered_keys = self.request_target_from_user(image, bounding_box)
-                if len(entered_keys)>0 and (k in keys for k in entered_keys):
-                    n = int(''.join(map(chr, entered_keys)))
-                    responses.append(n)
-                    roi = DartHelper.create_roi(mask, bounding_box)
-                    sample = DartHelper.reshape_roi(roi)
-                    samples = np.append(samples,sample,0)
-                    print(responses)
+
+                    if len(entered_keys)>0 and (k in keys for k in entered_keys):
+                        n = int(''.join(map(chr, entered_keys)))
+                        responses.append(n)
+                        roi = DartHelper.create_roi(mask, bounding_box)
+                        sample = DartHelper.reshape_roi(roi)
+                        samples = np.append(samples,sample,0)
+                        print(responses)
         responses = np.array(responses,np.float32)
         responses = responses.reshape((responses.size,1))
         return samples, responses
@@ -167,7 +182,7 @@ class DartTrainingDataCreator:
 
 
 
-train = True
+train = False
 
 t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dart4.png"
 img = cv2.imread(t, 1)

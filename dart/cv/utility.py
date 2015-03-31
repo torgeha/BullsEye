@@ -71,6 +71,12 @@ class Utility:
     @staticmethod
     def rot_matrix(theta):
         return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]]);
+
+    @staticmethod
+    def ellipse_area(ellipse):
+        w, h = ellipse[1][0],ellipse[1][1]
+        return math.pi * w/2 * h/2
+
     @staticmethod
     def scale_ellipse(ellipse, factor):
         #ellipse = ((center),(width,height of bounding rect), angle)
