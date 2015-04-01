@@ -7,7 +7,7 @@ from collections import deque
 
 class Utility:
     SCORES = deque([17,2,15,10,6,13,4,18,1,20,5,12,9,14,11,8,16,7,19,3])
-
+    DEBUG = False
     @staticmethod
     def convert_to_cv(normalized_matrix):
         image = np.array(normalized_matrix, dtype='uint8')
@@ -53,6 +53,8 @@ class Utility:
         if len(classifications) != 20:
             print("DAMN")
             print(len(classifications))
+            if (len(classifications))<20:
+                Utility.DEBUG = True
             while(len(classifications)) > 20:
                 classifications = sorted(classifications, key=lambda i: i[1], reverse=True)
                 print(classifications)

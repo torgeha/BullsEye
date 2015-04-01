@@ -47,13 +47,16 @@ class Board:
         #if not self._is_valid(red_scores, green_scores):
         #    #TODO: error handling. Remove or fix stuff
         #    return None, None, None
-        ellipse, approx_hull = self._fit_ellipse(red_scores)
+        ellipse, approx_hull = self._fit_ellipse(green_scores)
         center = self._identify_bullseye(red_scores, ellipse)
         #TODO: Default numbering, and ocr numbering
-        orientation = 0
         contours, number_mask, groups = DartHelper.create_number_descriptions(image, ellipse)
         predictions = self.learner.classify_all(number_mask, groups)
-        #predictions = self.learner.test(blurred, ellipse)
+        if len(predictions) <20:
+            cv2.drawContours(blurred, contours, -1, (255, 0, 0))
+            cv2.drawContours(blurred, red_scores, -1, (0,0,255))
+            cv2.imshow("debug", blurred)
+            cv2.waitKey(-1)
         predictions = Utility.classification_error_correction(center, predictions)
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
