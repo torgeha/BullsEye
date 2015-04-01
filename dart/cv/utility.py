@@ -46,6 +46,18 @@ class Utility:
             angle = angle + 360;
 
     @staticmethod
+    def find_closest(v_list, u):
+        #TODO: List comprehension
+        p = float('inf')
+        closest = None
+        for i, v in enumerate(v_list):
+            angle = math.acos(np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u)))
+            if angle < p:
+                closest = i
+                p = angle
+        return closest
+
+    @staticmethod
     def classification_error_correction(center, classifications):
         #Will sort based on proximity
         #Ensure that there are only 20 objects

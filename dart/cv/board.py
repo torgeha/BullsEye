@@ -93,7 +93,7 @@ class Board:
 
             x,y = Utility.get_centroid(c)
             u = np.array([center[0]-x, center[1]-y])
-            n = self.find_closest(v, u)
+            n = Utility.find_closest(v, u)
             scores.append(predictions[n][1])
         return scores
 
@@ -115,27 +115,14 @@ class Board:
             cv2.fillConvexPoly(mask, box, score[i])
         return mask
 
-    #TODO: Put in utility
-    def find_closest(self, v_list, u):
-        #TODO: List comprehension
-        p = float('inf')
-        closest = None
-        for i, v in enumerate(v_list):
-            angle = math.acos(np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u)))
-            if angle < p:
-                closest = i
-                p = angle
-        return closest
-
-    def _draw_special(self, mask, score_areas, scores, orient=0):
+    def _draw_special(self, mask, score_areas, scores):
         outer = score_areas[0]
         inner = score_areas[1]
         center = score_areas[2]
-        #len(outer))
-        #print(len(inner))
+
         for i in range(len(outer)):
-            #print("score",2*scores[i])
             cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
+
         for i in range(len(inner)):
             cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
         cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
@@ -164,6 +151,7 @@ class Board:
             x,y = Utility.get_centroid(cnt)
             x_v = center[0] -x
             y_v = center[1] - y
+            #TODO: Angle neccesary???
 
             dist = math.sqrt(x_v**2+ y_v**2)
             inside = Utility.inside_ellipse((x,y), short_ellipse)
@@ -224,8 +212,3 @@ class Board:
         green = Utility.remove_bw_noise(green, kernel=kernel)
         green = Utility.expand(green)
         return red, green
-
-    def _outline_segmentation(self, image):
-        grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        return thresh
