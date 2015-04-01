@@ -44,7 +44,7 @@ class DartLearner:
 
                 classifications.append((rect, result))
             else:
-                classifications.append(-1)
+                classifications.append((rect, -1))
         #TODO: Mend errors. Take advantage of knowing order and that a prediction should only apply once
         return classifications
 

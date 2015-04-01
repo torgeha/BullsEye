@@ -52,9 +52,16 @@ class Utility:
         #Error correct based on order
         if len(classifications) != 20:
             print("DAMN")
-            raise Exception("NOT 20")
+            print(len(classifications))
+            while(len(classifications)) > 20:
+                classifications = sorted(classifications, key=lambda i: i[1], reverse=True)
+                print(classifications)
+                classifications.pop()
+                print(len(classifications))
+
         s = sorted(classifications, key=lambda i: Utility.angle(center, i[0][0], i[0][1]))
         #TODO: Find most common subsequence in list. Hamming distance etc etc.
+        #TODO: If less than 20 found. Use the few left and rebuild using angles and vectors
         score = Utility.SCORES
         max_correct = 0
         best = 0
@@ -64,11 +71,10 @@ class Utility:
                 max_correct = correct
                 best = i
             score.rotate()
-        print(best)
+
         for i in range(len(score)):
-            v = score[i+best]
+            v = score[(i+best)%len(score)]
             s[i] = (s[i][0], v)
-        print(s)
         return s
 
 
@@ -109,6 +115,7 @@ class Utility:
     def scale_ellipse(ellipse, factor):
         #ellipse = ((center),(width,height of bounding rect), angle)
         return (ellipse[0], (ellipse[1][0]*factor,ellipse[1][1]*factor) , ellipse[2])
+
     @staticmethod
     def angle( center, x,y):
         return math.atan2(center[0]-x, center[1]-y)

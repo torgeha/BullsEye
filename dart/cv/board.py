@@ -54,7 +54,7 @@ class Board:
         contours, number_mask, groups = DartHelper.create_number_descriptions(image, ellipse)
         predictions = self.learner.classify_all(number_mask, groups)
         #predictions = self.learner.test(blurred, ellipse)
-        Utility.classification_error_correction(center, predictions)
+        predictions = Utility.classification_error_correction(center, predictions)
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, predictions)
@@ -67,22 +67,38 @@ class Board:
         shape = (size[0], size[1])
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
-        mask = self._draw_sectors(mask, green[0], center, self.green_score, orient=predictions)
-        mask = self._draw_sectors(mask, red[0], center, self.red_score, predictions)
-        self._draw_special(mask, green, self.green_score, orient=predictions)
-        self._draw_special(mask,red, self.red_score, orient=predictions)
+        g = self._get_scores_for_contours(green[0], predictions, center)
+        g.append(25)
+        r = self._get_scores_for_contours(red[0], predictions, center)
+        r.append(50)
+        mask = self._draw_sectors(mask, green[0], center, g)
+
+        mask = self._draw_sectors(mask, red[0], center, r)
+        self._draw_special(mask, green, g)
+        self._draw_special(mask,red, r)
         return mask
 
-    def _draw_sectors(self, mask, sectors, center, score, orient=None):
+    def _get_scores_for_contours(self, contours, predictions, center):
+        v = []
+        scores = []
+        for p in predictions:
+            x,y,w,h = p[0]
+            v.append(np.array([center[0]-x, center[1]-y]))
+
+        for sector in contours:
+            c = sector[2]
+
+            x,y = Utility.get_centroid(c)
+            u = np.array([center[0]-x, center[1]-y])
+            n = self.find_closest(v, u)
+            scores.append(predictions[n][1])
+        return scores
+
+    def _draw_sectors(self, mask, sectors, center, score):
         '''
         Use the outer ring to calculate extreme points. These points are averaged to e1 and e2, which
         combined with the center points becomes a sector.
         '''
-        #Score prep using predictions
-        v = []
-        for n in orient:
-            x,y,w,h = n[0]
-            v.append(np.array([center[0]-x, center[1]-y]))
         for i in range(len(sectors)):
             t = sectors[i][2]
             c =  sectors[i][0]
@@ -93,23 +109,21 @@ class Board:
             box = np.int0(box)
             box = np.vstack([box, center])
             box = cv2.convexHull(box)
-            s = self.find_closest(v, np.array([center[0]-rect[0][0], center[1]-rect[0][1]]))
-            print(orient[s][1])
-            cv2.fillConvexPoly(mask, box, orient[s][1])
-
-
+            cv2.fillConvexPoly(mask, box, score[i])
         return mask
+
     #TODO: Put in utility
     def find_closest(self, v_list, u):
         #TODO: List comprehension
         p = float('inf')
         closest = None
         for i, v in enumerate(v_list):
-            cross = abs(np.cross(v,u ))
-            if cross < p:
+            angle = math.acos(np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u)))
+            if angle < p:
                 closest = i
-                p = cross
+                p = angle
         return closest
+
     def _draw_special(self, mask, score_areas, scores, orient=0):
         outer = score_areas[0]
         inner = score_areas[1]
