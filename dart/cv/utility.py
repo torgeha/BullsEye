@@ -17,10 +17,16 @@ class Utility:
     @staticmethod
     def remove_bw_noise(noisy_image, kernel=None):
         if kernel == None:
+            print("OHSHIT")
             kernel = np.ones((3,3),np.uint8)
         erosion = cv2.erode(noisy_image,kernel,iterations = 1)
         dilation = cv2.dilate(erosion,kernel,iterations = 1)
         return dilation
+
+    @staticmethod
+    def circular_kernel(radius):
+        circle = np.zeros((radius*2,radius*2), np.uint8)
+        return cv2.circle(circle,(radius,radius),radius,1,thickness=-1)
 
     @staticmethod
     def get_avg_pos(contours):

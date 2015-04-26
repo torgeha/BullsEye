@@ -25,6 +25,7 @@ class Board:
         self.green_score = green_score
 
 
+
     def detect_ellipse(self, image):
         blurred = cv2.GaussianBlur(image,(5,5),0)
         red_mask, green_mask = self._color_difference_segmentation(blurred)
@@ -40,14 +41,24 @@ class Board:
         '''
 
         blurred = cv2.GaussianBlur(image,(5,5),0)
+        thresh = self._theshold(blurred)
         #TODO: Make outline and center available as self.
         red_mask, green_mask = self._color_difference_segmentation(blurred)
+
+        red_mask = self._prune_board(thresh, red_mask)
+        green_mask = self._prune_board(thresh, green_mask)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
-        board_sector = self._identify_board(image)
+
+        board_sector = self._identify_board(thresh)
+        #for ctn in [board_sector]:
+        #    cv2.drawContours(blurred,[cnt],0,255,-1)
+
         if not self._is_valid(red_scores, green_scores):
+            print("Red scores or green scores are not valid")
             return None, None, None
             #TODO: error handling. Remove or fix stuff
+
         bounding, approx_hull = self._fit_ellipse([board_sector])
         ellipse, approx_hull = self._fit_ellipse(red_scores, bounding=bounding)
         center = self._identify_bullseye(red_scores, ellipse)
@@ -63,6 +74,11 @@ class Board:
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
         mask = self._create_score_mask(image.shape, ellipse, red_id, green_id, center, predictions)
         return center, ellipse, mask
+
+
+    def _prune_board(self, thresh, mask):
+        return np.array(np.logical_and(thresh, mask)*255, np.uint8)
+
 
     def _is_valid(self, red_scores, green_scores):
         return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
@@ -143,6 +159,7 @@ class Board:
     def _create_description_areas(self, mask):
         #TODO: better way of combining
         mask = Utility.expand(mask)
+
         #TODO: Remove countours that should not be there. 21, and 22 countours not more or less.
         img,contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         #TODO:Combine close ones, and prune noise outside.
@@ -211,15 +228,12 @@ class Board:
                 prune_indices.append(i)
         return np.delete(contours, prune_indices)
 
-    def _identify_board(self, image):
-        blurred = cv2.GaussianBlur(image,(25,25),0)
-        grey = cv2.cvtColor(blurred, cv2.COLOR_RGB2GRAY)
-        ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
-        #cv2.imshow("ttt", thresh)
-        #cv2.waitKey(-1)
+    def _identify_board(self, thresh):
+        #TODO: move to identify, use threshold elsewhere
         img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         max_contour = max(contours, key=lambda c: cv2.arcLength(c, True))
+
+
         occurances = {}
         #for h in hierarchy[0][0]:
         #    if h[3] not in occurances:
@@ -230,6 +244,20 @@ class Board:
         #cv2.waitKey(-1)
         return max_contour
 
+    def _theshold(self, image):
+        blurred = cv2.GaussianBlur(image,(25,25),0)
+        grey = cv2.cvtColor(blurred, cv2.COLOR_RGB2GRAY)
+        ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
+        des = cv2.bitwise_not(thresh)
+        #Hole filling
+        #TODO: Generalize , so findcountours does not get called like 10 times.
+        img,contours,hierarchy = cv2.findContours(des,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours:
+            cv2.drawContours(des,[cnt],0,255,-1)
+        kernel = Utility.circular_kernel(40)
+        des  = Utility.remove_bw_noise(des, kernel=kernel)
+        return des
 
     def _color_difference_segmentation(self, image):
         b,g,r = cv2.split(image)
