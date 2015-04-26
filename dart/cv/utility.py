@@ -3,9 +3,11 @@ import cv2
 import math
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+from collections import deque
 
 class Utility:
-
+    SCORES = deque([17,2,15,10,6,13,4,18,1,20,5,12,9,14,11,8,16,7,19,3])
+    DEBUG = False
     @staticmethod
     def convert_to_cv(normalized_matrix):
         image = np.array(normalized_matrix, dtype='uint8')
@@ -43,6 +45,60 @@ class Utility:
         if (angle < 0):
             angle = angle + 360;
 
+    @staticmethod
+    def find_closest(v_list, u):
+        #TODO: List comprehension
+        p = float('inf')
+        closest = 0
+        for i, v in enumerate(v_list):
+
+            temp = np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u))
+            if np.allclose(temp, -1):
+                angle = math.pi
+            elif np.allclose(temp, -1):
+                angle = 0
+            else:
+                angle = math.acos(temp)
+
+            if angle < p:
+                closest = i
+                p = angle
+        return closest
+
+    @staticmethod
+    def classification_error_correction(center, classifications):
+        #Will sort based on proximity
+        #Ensure that there are only 20 objects
+        #Error correct based on order
+        if len(classifications) != 20:
+            print(len(classifications))
+            if (len(classifications))<20:
+                print("Less than 20 classifications")
+                Utility.DEBUG = True
+            while(len(classifications)) > 20:
+                classifications = sorted(classifications, key=lambda i: i[1], reverse=True)
+                print(classifications)
+                classifications.pop()
+                print(len(classifications))
+
+        s = sorted(classifications, key=lambda i: Utility.angle(center, i[0][0], i[0][1]))
+        #TODO: Find most common subsequence in list. Hamming distance etc etc.
+        #TODO: If less than 20 found. Use the few left and rebuild using angles and vectors
+        score = Utility.SCORES
+        max_correct = 0
+        best = 0
+        for i in range(len(score)):
+            correct = sum([p == c[1] for p,c in zip(score, s)])
+            if correct > max_correct:
+                max_correct = correct
+                best = i
+            score.rotate()
+
+        for i in range(len(score)):
+            v = score[(i+best)%len(score)]
+            s[i] = (s[i][0], v)
+        return s
+
 
     @staticmethod
     def get_centroid(cnt):
@@ -52,7 +108,7 @@ class Utility:
 
     @staticmethod
     def expand(mask ,kernel=None):
-        if not kernel:
+        if kernel == None:
             kernel = np.ones((3,3),np.uint8)
         mask = cv2.dilate(mask, kernel, iterations=1)
         return mask
@@ -71,10 +127,17 @@ class Utility:
     @staticmethod
     def rot_matrix(theta):
         return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]]);
+
+    @staticmethod
+    def ellipse_area(ellipse):
+        w, h = ellipse[1][0],ellipse[1][1]
+        return math.pi * w/2 * h/2
+
     @staticmethod
     def scale_ellipse(ellipse, factor):
         #ellipse = ((center),(width,height of bounding rect), angle)
         return (ellipse[0], (ellipse[1][0]*factor,ellipse[1][1]*factor) , ellipse[2])
+
     @staticmethod
     def angle( center, x,y):
         return math.atan2(center[0]-x, center[1]-y)
