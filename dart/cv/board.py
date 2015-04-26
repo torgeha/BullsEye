@@ -57,7 +57,10 @@ class Board:
         if not self._is_valid(red_scores, green_scores):
             print("Red scores or green scores are not valid")
             return None, None, None
-            #TODO: error handling. Remove or fix stuff
+
+        if  board_sector is None:
+            print("Could not find countours, and therefore the board sector")
+            return None, None, None
 
         bounding, approx_hull = self._fit_ellipse([board_sector])
         ellipse, approx_hull = self._fit_ellipse(red_scores, bounding=bounding)
@@ -231,6 +234,8 @@ class Board:
     def _identify_board(self, thresh):
         #TODO: move to identify, use threshold elsewhere
         img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        if len(contours) <= 0:
+            return None
         max_contour = max(contours, key=lambda c: cv2.arcLength(c, True))
 
 
@@ -248,7 +253,7 @@ class Board:
         blurred = cv2.GaussianBlur(image,(25,25),0)
         grey = cv2.cvtColor(blurred, cv2.COLOR_RGB2GRAY)
         ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
+        #thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
         des = cv2.bitwise_not(thresh)
         #Hole filling
         #TODO: Generalize , so findcountours does not get called like 10 times.

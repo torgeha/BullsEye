@@ -17,7 +17,6 @@ class Utility:
     @staticmethod
     def remove_bw_noise(noisy_image, kernel=None):
         if kernel == None:
-            print("OHSHIT")
             kernel = np.ones((3,3),np.uint8)
         erosion = cv2.erode(noisy_image,kernel,iterations = 1)
         dilation = cv2.dilate(erosion,kernel,iterations = 1)
@@ -81,10 +80,12 @@ class Utility:
             if (len(classifications))<20:
                 print("Less than 20 classifications")
                 Utility.DEBUG = True
+            if len(classifications) > 20:
+                print("More than 20 classifications")
             while(len(classifications)) > 20:
                 classifications = sorted(classifications, key=lambda i: i[1], reverse=True)
-                print(classifications)
-                classifications.pop()
+                popped = classifications.pop()
+                print(popped)
                 print(len(classifications))
 
         s = sorted(classifications, key=lambda i: Utility.angle(center, i[0][0], i[0][1]))
