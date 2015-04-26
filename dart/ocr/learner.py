@@ -135,8 +135,23 @@ class DartHelper:
         roi = mask[y:y+h,x:x+w]
         #TODO: Resize keep aspect ratio. Scale down to 20 for longest axis and use padding
         #Might reduce accuracy. Use caution. Maybe introduce another feature to differenciate?
-        roi = cv2.resize(roi,(width,height))
+        print(DartHelper.get_size(w,h, width, height))
+        s = DartHelper.get_size(w,h, width, height)
+        roi = cv2.resize(roi,s[0])
+        roi = cv2.copyMakeBorder(roi,s[1][1], s[1][1], s[1][0], s[1][0], cv2.BORDER_CONSTANT, 0)
         return roi
+
+    @staticmethod
+    def get_size(w,h, nw, nh):
+        if w>h:
+            sh = int(math.floor((float(h)/w)*nw))
+            sh = sh + sh%2
+            return ((nw, sh),(0,(nh-sh)/2))
+        elif h>w:
+            sw = int(math.floor((float(w)/h)*nh))
+            sw = sw + sw%2
+            return ((sw, nh), ((nw-sw)/2 ,0))
+        return ((nw, nh), (0, 0))
 
     @staticmethod
     def reshape_roi(roi, length=400):

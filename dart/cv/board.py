@@ -6,6 +6,7 @@ import numpy as np
 from utility import Utility
 from ocr.learner import DartHelper, DartLearner
 
+from collections import Counter
 
 class Board:
 
@@ -15,8 +16,9 @@ class Board:
     RED_LIMIT = 60
     GREEN_LIMIT = 60
 
-    def __init__(self, red_score=RED_SCORES, green_score=GREEN_SCORES, green_limit=GREEN_LIMIT, red_limit=RED_LIMIT):
-        self.learner = DartLearner(samples=DartLearner.SAMPLE_FILENAME, responses=DartLearner.RESPONSE_FILENAME)
+    def __init__(self, red_score=RED_SCORES, green_score=GREEN_SCORES, green_limit=GREEN_LIMIT, red_limit=RED_LIMIT, debug=False):
+        if not debug:
+            self.learner = DartLearner(samples=DartLearner.SAMPLE_FILENAME, responses=DartLearner.RESPONSE_FILENAME)
         self.green_limit = green_limit
         self.red_limit = red_limit
         self.red_score = red_score
@@ -42,21 +44,20 @@ class Board:
         red_mask, green_mask = self._color_difference_segmentation(blurred)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
-
-
-        #if not self._is_valid(red_scores, green_scores):
-        #    #TODO: error handling. Remove or fix stuff
-        #    return None, None, None
-        ellipse, approx_hull = self._fit_ellipse(green_scores)
+        board_sector = self._identify_board(image)
+        if not self._is_valid(red_scores, green_scores):
+            return None, None, None
+            #TODO: error handling. Remove or fix stuff
+        bounding, approx_hull = self._fit_ellipse([board_sector])
+        ellipse, approx_hull = self._fit_ellipse(red_scores, bounding=bounding)
         center = self._identify_bullseye(red_scores, ellipse)
-        #TODO: Default numbering, and ocr numbering
         contours, number_mask, groups = DartHelper.create_number_descriptions(image, ellipse)
         predictions = self.learner.classify_all(number_mask, groups)
+
         if len(predictions) <20:
-            cv2.drawContours(blurred, contours, -1, (255, 0, 0))
-            cv2.drawContours(blurred, red_scores, -1, (0,0,255))
-            cv2.imshow("debug", blurred)
-            cv2.waitKey(-1)
+            print("To few predictions")
+            #TODO: Error correction
+            return None, None, None
         predictions = Utility.classification_error_correction(center, predictions)
         red_id = self._id_contours(red_scores,center, ellipse, blurred)
         green_id = self._id_contours(green_scores, center, ellipse, blurred)
@@ -71,14 +72,20 @@ class Board:
         mask = np.zeros(shape, np.uint8)
         cv2.ellipse(mask, ellipse, 100 ,thickness=-1)
         g = self._get_scores_for_contours(green[0], predictions, center)
-        g.append(25)
+        g2 = self._get_scores_for_contours(green[1], predictions, center)
         r = self._get_scores_for_contours(red[0], predictions, center)
-        r.append(50)
+        r2 = self._get_scores_for_contours(red[1], predictions, center)
         mask = self._draw_sectors(mask, green[0], center, g)
 
         mask = self._draw_sectors(mask, red[0], center, r)
-        self._draw_special(mask, green, g)
-        self._draw_special(mask,red, r)
+        self._draw_special(mask, green, (g,g2, 25))
+        self._draw_special(mask,red, (r,r2, 50))
+        for i,cnt in enumerate(green[0]):
+            c = cnt[2]
+            cv2.putText(mask,str(g[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
+        for i,cnt in enumerate(red[0]):
+            c = cnt[2]
+            cv2.putText(mask,str(r[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
         return mask
 
     def _get_scores_for_contours(self, contours, predictions, center):
@@ -113,6 +120,7 @@ class Board:
             box = np.vstack([box, center])
             box = cv2.convexHull(box)
             cv2.fillConvexPoly(mask, box, score[i])
+
         return mask
 
     def _draw_special(self, mask, score_areas, scores):
@@ -121,11 +129,13 @@ class Board:
         center = score_areas[2]
 
         for i in range(len(outer)):
-            cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[i], thickness=-1)
+            cv2.drawContours(mask, [outer[i][2]], -1, 2*scores[0][i], thickness=-1)
 
-        for i in range(len(inner)):
-            cv2.drawContours(mask, [inner[i][2]], -1, 3*scores[i], thickness=-1)
-        cv2.drawContours(mask, [center[2]], -1, scores[-1], thickness=-1)
+        for j in range(len(inner)):
+            cv2.drawContours(mask, [inner[j][2]], -1, 3*scores[1][j], thickness=-1)
+
+        for k in range(len(center)):
+            cv2.drawContours(mask, [center[k][2]], -1, scores[2], thickness=-1)
 
     def _extract_edges(self, image):
         return cv2.Canny(image,100,200)
@@ -146,7 +156,9 @@ class Board:
         outer_area = []
         inner_area = []
         short_ellipse = Utility.scale_ellipse(ellipse, 0.75)
-        c = None
+        center_ellipse = Utility.scale_ellipse(ellipse, 0.35)
+
+        center_area = []
         for cnt in contours:
             x,y = Utility.get_centroid(cnt)
             x_v = center[0] -x
@@ -155,21 +167,20 @@ class Board:
 
             dist = math.sqrt(x_v**2+ y_v**2)
             inside = Utility.inside_ellipse((x,y), short_ellipse)
-            a = Utility.angle(center, x, y)
+            is_center = Utility.inside_ellipse((x,y), center_ellipse)
+            a = 0 #Removed angle, but not from tuple
+            description = (a, dist, cnt)
             if not inside:
-                outer_area.append((a,dist , cnt ))
-            elif inside and dist > 10:
-                inner_area.append((a,dist,cnt))
+                outer_area.append(description)
+            elif inside and not is_center:
+                inner_area.append(description)
             else:
-                c = (a,dist , cnt)
-        outer_area.sort(key=lambda k: k[0])
-        inner_area.sort(key=lambda k: k[0])
-        return (outer_area, inner_area, c)
+                center_area.append(description)
+
+        return (outer_area, inner_area, center_area)
 
 
     def _identify_bullseye(self, descriptions, ellipse):
-
-        #avg_x, avg_y = Utility.get_avg_pos(descriptions)
         #Center of ellipse might be some off the true center.
         #Find contour that match center best and return it
         avg_x, avg_y = ellipse[0]
@@ -184,13 +195,41 @@ class Board:
                 min_dist = dist
         return center
 
-    def _fit_ellipse(self, contours):
-        if(len(contours)>4):
-            cont = np.vstack(ctn for ctn in contours)
-            hull =  cv2.convexHull(cont)
-            ellipse = cv2.fitEllipse(hull)
-            return ellipse, hull
-        return None
+    def _fit_ellipse(self, contours, bounding=None):
+        if bounding:
+            contours = self._prune(contours, bounding)
+        cont = np.vstack(ctn for ctn in contours)
+        hull =  cv2.convexHull(cont)
+        ellipse = cv2.fitEllipse(hull)
+        return ellipse, hull
+
+    def _prune(self, contours, bounding):
+        prune_indices = []
+        for i,cnt in enumerate(contours):
+
+            if not Utility.inside_ellipse(Utility.get_centroid(cnt), bounding):
+                prune_indices.append(i)
+        return np.delete(contours, prune_indices)
+
+    def _identify_board(self, image):
+        blurred = cv2.GaussianBlur(image,(25,25),0)
+        grey = cv2.cvtColor(blurred, cv2.COLOR_RGB2GRAY)
+        ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
+        #cv2.imshow("ttt", thresh)
+        #cv2.waitKey(-1)
+        img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        max_contour = max(contours, key=lambda c: cv2.arcLength(c, True))
+        occurances = {}
+        #for h in hierarchy[0][0]:
+        #    if h[3] not in occurances:
+        #        occurances[h[3]] = 1
+        #    occurances[h[3]] += 1
+        #cv2.drawContours(image, max_contour, -1, (255,0,0), 2)
+        #cv2.imshow("ttt", image)
+        #cv2.waitKey(-1)
+        return max_contour
+
 
     def _color_difference_segmentation(self, image):
         b,g,r = cv2.split(image)

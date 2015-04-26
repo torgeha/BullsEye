@@ -2,13 +2,14 @@ from ocr.learner import DartHelper, DartLearner
 import cv2
 from cv.board import Board
 import numpy as np
-
+import random
 
 class DartTrainingDataCreator:
     SAMPLE_FILENAME = "dart_samples.data"
     RESPONSE_FILENAME = "dart_targets.data"
     ENTER = 13
     ESCAPE = 27
+    NR_OF_SAMPLES = 10
 
     def sample(self, image, ellipse, sample_file=SAMPLE_FILENAME, response_file=RESPONSE_FILENAME):
         contours, mask, groups = DartHelper.create_number_descriptions(image, ellipse)
@@ -47,10 +48,14 @@ class DartTrainingDataCreator:
 
                     if len(entered_keys)>0 and (k in keys for k in entered_keys):
                         n = int(''.join(map(chr, entered_keys)))
-                        responses.append(n)
                         roi = DartHelper.create_roi(mask, rect)
                         sample = DartHelper.reshape_roi(roi)
-                        samples = np.append(samples,sample,0)
+                        for i in range(DartTrainingDataCreator.NR_OF_SAMPLES):
+                            samples = np.append(samples,sample,0)
+                            responses.append(n)
+                            M = cv2.getRotationMatrix2D((10,10),int(random.randint(0,360)),1)
+                            roi = cv2.warpAffine(roi,M,(20,20))
+                            sample = DartHelper.reshape_roi(roi)
                         print(responses)
         responses = np.array(responses,np.float32)
         responses = responses.reshape((responses.size,1))
@@ -61,11 +66,11 @@ class DartTrainingDataCreator:
 
 
 
-train = False
+train = True
 
-t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dart2.png"
+t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard15.png"
 img = cv2.imread(t, 1)
-b = Board()
+b = Board(debug=True)
 ellipse = b.detect_ellipse(img)
 if train:
     learner = DartTrainingDataCreator()

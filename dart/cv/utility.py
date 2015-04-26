@@ -49,9 +49,17 @@ class Utility:
     def find_closest(v_list, u):
         #TODO: List comprehension
         p = float('inf')
-        closest = None
+        closest = 0
         for i, v in enumerate(v_list):
-            angle = math.acos(np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u)))
+
+            temp = np.dot(v, u) / (np.linalg.norm(v)*np.linalg.norm(u))
+            if np.allclose(temp, -1):
+                angle = math.pi
+            elif np.allclose(temp, -1):
+                angle = 0
+            else:
+                angle = math.acos(temp)
+
             if angle < p:
                 closest = i
                 p = angle
@@ -63,9 +71,9 @@ class Utility:
         #Ensure that there are only 20 objects
         #Error correct based on order
         if len(classifications) != 20:
-            print("DAMN")
             print(len(classifications))
             if (len(classifications))<20:
+                print("Less than 20 classifications")
                 Utility.DEBUG = True
             while(len(classifications)) > 20:
                 classifications = sorted(classifications, key=lambda i: i[1], reverse=True)
@@ -100,7 +108,7 @@ class Utility:
 
     @staticmethod
     def expand(mask ,kernel=None):
-        if not kernel:
+        if kernel == None:
             kernel = np.ones((3,3),np.uint8)
         mask = cv2.dilate(mask, kernel, iterations=1)
         return mask
