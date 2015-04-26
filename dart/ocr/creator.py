@@ -9,7 +9,7 @@ class DartTrainingDataCreator:
     RESPONSE_FILENAME = "dart_targets.data"
     ENTER = 13
     ESCAPE = 27
-    NR_OF_SAMPLES = 10
+    NR_OF_SAMPLES = 5
 
     def sample(self, image, ellipse, sample_file=SAMPLE_FILENAME, response_file=RESPONSE_FILENAME):
         contours, mask, groups = DartHelper.create_number_descriptions(image, ellipse)
@@ -36,7 +36,7 @@ class DartTrainingDataCreator:
         return entered_keys
 
     def get_numbers(self, groups, mask, image):
-        samples =  np.empty((0,400))
+        samples =  np.empty((0,100))
         responses = []
         for n in groups:
             avg_area, points, rect =  DartHelper.get_group_description(n)
@@ -54,7 +54,7 @@ class DartTrainingDataCreator:
                             samples = np.append(samples,sample,0)
                             responses.append(n)
                             M = cv2.getRotationMatrix2D((10,10),int(random.randint(0,360)),1)
-                            roi = cv2.warpAffine(roi,M,(20,20))
+                            roi = cv2.warpAffine(roi,M,(10,10))
                             sample = DartHelper.reshape_roi(roi)
                         print(responses)
         responses = np.array(responses,np.float32)
@@ -68,7 +68,7 @@ class DartTrainingDataCreator:
 
 train = True
 
-t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard15.png"
+t = "C:\Users\Olav\OneDrive for Business\BullsEye\Pictures\dartboard65.png"
 img = cv2.imread(t, 1)
 b = Board(debug=True)
 ellipse = b.detect_ellipse(img)
