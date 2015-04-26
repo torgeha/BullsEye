@@ -29,6 +29,9 @@ class Board:
     def detect_ellipse(self, image):
         blurred = cv2.GaussianBlur(image,(5,5),0)
         red_mask, green_mask = self._color_difference_segmentation(blurred)
+        thresh = self._theshold(blurred)
+        red_mask = self._prune_board(thresh, red_mask)
+        green_mask = self._prune_board(thresh, green_mask)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
         ellipse, approx_hull = self._fit_ellipse(red_scores)
