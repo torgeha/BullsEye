@@ -149,7 +149,7 @@ class Camera:
                     # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
                     frame_with_arrow = last_frame
                     # cv2.imshow("arrow", frame_with_arrow)
-                    cv2.imshow("arrowgray", last_frame_gray)
+                    # cv2.imshow("arrowgray", last_frame_gray)
 
                     find_arrow(base_frame_gray, last_frame_gray)
 
