@@ -3,6 +3,7 @@ import cv2
 import time
 import threading
 from Queue import Queue
+from numpy.lib.type_check import _getmaxmin
 
 from cv.framediff import classify_change, find_arrow
 from cv.board import Board
@@ -35,11 +36,7 @@ class Camera:
         ret, frame = self.video.read()
         self.width = len(frame[0])
         self.height = len(frame)
-        # self.nof_pixels = self.width * self.height
-        # self.max_change = self.nof_pixels * 255
         self.board = Board()
-
-        # print self.max_change
 
         self.capture()
 
@@ -50,10 +47,12 @@ class Camera:
         # base_frame = self.buffer.get_frame()
         last_frame = base_frame
         roi_last = None
+        bounding_box = None
         base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
         last_frame_gray = base_frame_gray
 
-        percent_threshold = 0.01 # TODO: This should be based on bounding box of dart board! This would make distance from board unimportant
+        # All changes under this will be ignored
+        percent_threshold = 0.02
 
         # Fps stuff
         loop_delta = 1./self.fps_limit
@@ -66,9 +65,6 @@ class Camera:
         if self.is_live:
             wait_per_frame = 1000
 
-        # Evaluation fps stuff
-        loop_count = 0
-
         # Padding for the board bounding box
         bounding_offset = 70
 
@@ -79,8 +75,6 @@ class Camera:
                 sleep_time = target_time - time.clock()
                 if sleep_time > 0:
                     time.sleep(sleep_time)
-
-
             # Loop frequency evaluation, prints actual fps
             previous_time, current_time = current_time, time.clock()
             time_delta = current_time - previous_time
@@ -93,61 +87,47 @@ class Camera:
                 break # no more frames to read
             cv2.imshow("FEED", new_frame)
             cv2.waitKey(1)
-            # print "lfc", last_frame_changed
-            # print "lfa", last_frame_arrow
-
-            # Display video feed?
-            # if self.should_display:
-            #     cv2.imshow('Feed', new_frame)
 
             # Detect board and use it to base the finding of changes
-            center, ellipse, mask = self.board.detect(new_frame)
+            # Bounding box is none before a baseframe is found
+            should_set_baseframe = False
+            if bounding_box is None:
+                # Try to find board if the boundingbox is not set
+                bounding_box = self._get_bounding_box(new_frame, bounding_offset)
 
-            # TODO: no baseframe until board is detected. Set boundingbox, check this for change
+                if bounding_box is None:
+                    continue
 
-            # Should not be None
-            if center is None:
-                print("skipping frame")
-                continue
-            if ellipse is None:
-                print("skipping frame")
-                continue
-            if mask is None:
-                print("skipping frame")
-                continue
+                should_set_baseframe = True
 
-            cv2.imshow("MASK", mask)
-
-            # Get the bounding box of the detected board: ((minx, miny),(maxx, maxy))
-            board_bounding_box = self._get_bounding_box(ellipse, bounding_offset)
-
+            # Code will never reach here if boundingbox is not set
+            # Convert current frame to gray
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
 
-            # Crop new frame, find ROI. Use same bounging box on both
-            roi_new = new_frame_gray[board_bounding_box[0][1]:board_bounding_box[1][1], board_bounding_box[0][0]:board_bounding_box[1][0]]
-            roi_last = last_frame_gray[board_bounding_box[0][1]:board_bounding_box[1][1], board_bounding_box[0][0]:board_bounding_box[1][0]]
+            # This happens first time ONLY
+            if should_set_baseframe:
+                base_frame = new_frame
+                base_frame_gray = new_frame_gray
+                last_frame = base_frame
+                last_frame_gray = base_frame_gray
+                last_frame_changed = False
+                print "************* NEW BASE SET ****************"
+                print " ..and bounding box is", bounding_box
+                cv2.imshow("BASE", base_frame)
+                continue
+
+            # Crop frame, find Roi of current frame and last frame
+            roi_new = new_frame_gray[bounding_box[0][1]:bounding_box[1][1], bounding_box[0][0]:bounding_box[1][0]]
+            roi_last = last_frame_gray[bounding_box[0][1]:bounding_box[1][1], bounding_box[0][0]:bounding_box[1][0]]
 
             # Find max change based on ROI
-            # TODO: move into method ----------------------
-            width = len(roi_new[0])
-            height = len(roi_new)
-            nof_pixels = width * height
-            max_change = nof_pixels * 255
-            # TODO: --------------------------------------
+            max_change = self._get_max_change(roi_new)
 
-            # TODO: nothing changed? --> continue
-            # TODO: camera/arrow --> wait x frames and find arrow_pos/set new base frame
-
-            # Only find change if there was a last frame
-            if not roi_last is None:
-                # change_percent, change = classify_change(last_frame_gray,
-                #                                          new_frame_gray,
-                #                                          percent_threshold,
-                #                                          self.max_change)
-                change_percent, change = classify_change(roi_last,
-                                                         roi_new,
-                                                         percent_threshold,
-                                                         max_change)
+            # Find change between this frame and the previous frame
+            change_percent, change = classify_change(roi_last,
+                                                     roi_new,
+                                                     percent_threshold,
+                                                     max_change)
             print "change: ", change_percent, " value: ", change
 
             if cv2.waitKey(wait_per_frame) & 0xFF == ord('q'):
@@ -156,11 +136,14 @@ class Camera:
             if change == 0: # Nothing changed, continue
                 if last_frame_changed:
                     # last frame changed and is now stable, set new base_frame
-                    base_frame = new_frame
-                    base_frame_gray = new_frame_gray
-                    cv2.imshow('baseframe', base_frame)
-                    last_frame_changed = False
-                    print "**************************  NEW BASE"
+                    # By setting the boudning_box to None, the next loop will set new base when bounding box is found
+                    bounding_box = None
+
+                    # base_frame = new_frame
+                    # base_frame_gray = new_frame_gray
+                    # cv2.imshow('baseframe', base_frame)
+                    # last_frame_changed = False
+                    # print "**************************  NEW BASE"
                 elif last_frame_arrow:
                     # Arrow detected in last frame, now stable, find location
                     # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
@@ -186,7 +169,36 @@ class Camera:
 
         cv2.destroyAllWindows()
 
-    def _get_bounding_box(self, ellipse, bounding_offset):
+    def _find_base_frame(self):
+        """
+        Return baseframe
+        """
+
+    def _get_max_change(self, roi):
+        width = len(roi[0])
+        height = len(roi)
+        nof_pixels = width * height
+        return nof_pixels * 255
+
+    def _get_bounding_box(self, frame, bounding_offset):
+        """
+        Will not return until board is detected. Returns bounding box of board
+        """
+
+        # Try to find board if the boundingbox is not set
+        center, ellipse, mask = self.board.detect(frame)
+
+        # Should not be None
+        if center is None:
+            print("skipping frame")
+            return None
+        if ellipse is None:
+            print("skipping frame")
+            return None
+        if mask is None:
+            print("skipping frame")
+            return None
+
         x_offset = (ellipse[1][0] / 2)
         x_center = ellipse[0][0]
 
@@ -197,7 +209,6 @@ class Camera:
         maxx = min(self.width, x_center + x_offset + bounding_offset)
         miny = max(0, y_center - y_offset - bounding_offset)
         maxy = min(self.height, y_center + y_offset + bounding_offset)
-
         return ((int(minx), int(miny)), (int(maxx), int(maxy)))
 
 class CameraBuffer:
@@ -240,13 +251,15 @@ class CameraBuffer:
             return self.buffer.get()
         return None
 
+if __name__ == "__main__":
+    cam = Camera(2, 5, 5, True)
 
 
 # Testing
 
-path = "C:\Users\Torgeir\Desktop\dartH264"
-
-path = path + "\dart2.mp4"
+# path = "C:\Users\Torgeir\Desktop\dartH264"
+#
+# path = path + "\dart2.mp4"
 
 # cap = cv2.VideoCapture(path)
 #
@@ -283,6 +296,6 @@ path = path + "\dart2.mp4"
 
 
 
-print path
+# print path
 
-cam = Camera(2, 5, 5, True)
+

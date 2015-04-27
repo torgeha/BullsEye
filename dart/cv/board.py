@@ -29,6 +29,9 @@ class Board:
     def detect_ellipse(self, image):
         blurred = cv2.GaussianBlur(image,(5,5),0)
         red_mask, green_mask = self._color_difference_segmentation(blurred)
+        thresh = self._theshold(blurred)
+        red_mask = self._prune_board(thresh, red_mask)
+        green_mask = self._prune_board(thresh, green_mask)
         red_scores = self._create_description_areas(red_mask)
         green_scores = self._create_description_areas(green_mask)
         ellipse, approx_hull = self._fit_ellipse(red_scores)
@@ -65,7 +68,10 @@ class Board:
             # cv2.imshow("green", green_mask)
             # cv2.waitKey(0)
             return None, None, None
-            #TODO: error handling. Remove or fix stuff
+
+        if  board_sector is None:
+            print("Could not find countours, and therefore the board sector")
+            return None, None, None
 
         bounding, approx_hull = self._fit_ellipse([board_sector])
         ellipse, approx_hull = self._fit_ellipse(red_scores, bounding=bounding)
@@ -258,7 +264,7 @@ class Board:
         blurred = cv2.GaussianBlur(image,(25,25),0)
         grey = cv2.cvtColor(blurred, cv2.COLOR_RGB2GRAY)
         ret,thresh = cv2.threshold(grey,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
+        #thresh = Utility.expand(thresh, kernel=np.ones((7,7), np.uint8))
         des = cv2.bitwise_not(thresh)
         #Hole filling
         #TODO: Generalize , so findcountours does not get called like 10 times.

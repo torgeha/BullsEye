@@ -2,28 +2,7 @@
 import cv2
 import numpy as np
 
-from board import Board
-
 # from utility import Utility
-
-# class Detector:
-#     """
-#     Subframe, used to determine if change in frame is due to arrow, camera change or other.
-#     """
-#
-#     def __init__(self, xmin, ymin, width, height):
-#         self.xmin = xmin
-#         self.ymin = ymin
-#         self.widt = width
-#         self.height = height
-#
-#     def includes(self, pix_x, pix_y):
-#         """
-#         Return true if given pixel is inside this detector.
-#         """
-#         # TODO: expand to take range of pixels?
-#         pass
-
 
 def classify_change(base_frame, new_frame, percent_threshold, max_change):
     """
@@ -33,8 +12,6 @@ def classify_change(base_frame, new_frame, percent_threshold, max_change):
 
     Returns tuple of (percent, value)
     """
-
-    # TODO: expand to use detectors based on dart board location
 
     # New shit, based on bounding box
     # cv2.imshow("base", base_frame)
@@ -51,7 +28,7 @@ def classify_change(base_frame, new_frame, percent_threshold, max_change):
     # TODO: tune these parameters to dart board
     if change_percent < percent_threshold: # Change is under percent_threshold, nothing changed
         return (change_percent, 0)
-    elif change_percent < 1.5: # Change is more than thresh, less than 1.5 --> arrow
+    elif change_percent < 7: # Change is more than thresh, less than 1.5 --> arrow
         return (change_percent, 1)
     else: # More has changed --> camera
         return (change_percent, 2)
@@ -86,12 +63,16 @@ def find_arrow(base_img, arrow_img):
     # Compute diff
     diff_img = _compute_diff(base_img, arrow_img)
 
+    # TODO> and with blue
+
+    cv2.imshow("DIFF 1", diff_img)
     # Some morphology and thresholding to isolate arrow further
     isolated_arrow_img = _isolate_arrows(diff_img)
-    # cv2.imshow("isolatedArrow", isolated_arrow_img)
+    cv2.imshow("dilate 6", isolated_arrow_img)
 
     # Find coordinates within picture based on isolated arrows
     coordinates = _locate_arrow(isolated_arrow_img)
+    print "Coordinates of "
 
     # TODO: return coordinates here?
 
@@ -109,18 +90,18 @@ def _isolate_arrows(diff_img):
 
     strel = np.ones((3, 3), np.uint8)
     open = cv2.morphologyEx(diff_img, cv2.MORPH_OPEN, strel)
-    # cv2.imshow("open2", open)
+    cv2.imshow("open 2", open)
 
     blur = cv2.GaussianBlur(open, (5, 5), 0)
-    # cv2.imshow("blur3", blur)
+    cv2.imshow("blur 3", blur)
 
     ret, thresh_img = cv2.threshold(blur, 20, 255, cv2.THRESH_BINARY)
 
-    # cv2.imshow("thresh4", thresh_img)
+    cv2.imshow("thresh 4", thresh_img)
 
     strel2 = np.ones((5, 5), np.uint8)
     open_thresh = cv2.morphologyEx(thresh_img, cv2.MORPH_OPEN, strel2)
-    # cv2.imshow("open_thresh5", open_thresh)
+    cv2.imshow("open 5", open_thresh)
 
     # Dilating to merge blobs belonging to the same arrow together
     strel3 = np.ones((5, 5), np.uint8)

@@ -30,6 +30,7 @@ class DartLearner:
         pass
 
     def classify(self, roi):
+
         return self.model.predict(roi)
 
     def classify_all(self, mask, groups):
@@ -40,6 +41,9 @@ class DartLearner:
             if avg_area >20 and h>4:
                 roi = DartHelper.create_roi(mask, [x,y,w,h])
                 roi = DartHelper.reshape_roi(roi)
+                #cv2.imshow("tttssd", np.reshape(roi,(10,10)))
+                #cv2.waitKey(-1)
+                #print(self.model.predict(roi))
                 result = int((self.model.predict(roi)))
 
                 classifications.append((rect, result))
@@ -130,12 +134,11 @@ class DartHelper:
         return []
 
     @staticmethod
-    def create_roi(mask, rectangle, width=20, height=20):
+    def create_roi(mask, rectangle, width=10, height=10):
         x,y,w,h = rectangle
         roi = mask[y:y+h,x:x+w]
         #TODO: Resize keep aspect ratio. Scale down to 20 for longest axis and use padding
         #Might reduce accuracy. Use caution. Maybe introduce another feature to differenciate?
-        print(DartHelper.get_size(w,h, width, height))
         s = DartHelper.get_size(w,h, width, height)
         roi = cv2.resize(roi,s[0])
         roi = cv2.copyMakeBorder(roi,s[1][1], s[1][1], s[1][0], s[1][0], cv2.BORDER_CONSTANT, 0)
@@ -154,7 +157,7 @@ class DartHelper:
         return ((nw, nh), (0, 0))
 
     @staticmethod
-    def reshape_roi(roi, length=400):
+    def reshape_roi(roi, length=100):
         return np.float32(roi.reshape((1,length)))
 
     @staticmethod
