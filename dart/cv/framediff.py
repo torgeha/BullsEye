@@ -2,25 +2,27 @@
 import cv2
 import numpy as np
 
-from utility import Utility
+from board import Board
 
-class Detector:
-    """
-    Subframe, used to determine if change in frame is due to arrow, camera change or other.
-    """
+# from utility import Utility
 
-    def __init__(self, xmin, ymin, width, height):
-        self.xmin = xmin
-        self.ymin = ymin
-        self.widt = width
-        self.height = height
-
-    def includes(self, pix_x, pix_y):
-        """
-        Return true if given pixel is inside this detector.
-        """
-        # TODO: expand to take range of pixels?
-        pass
+# class Detector:
+#     """
+#     Subframe, used to determine if change in frame is due to arrow, camera change or other.
+#     """
+#
+#     def __init__(self, xmin, ymin, width, height):
+#         self.xmin = xmin
+#         self.ymin = ymin
+#         self.widt = width
+#         self.height = height
+#
+#     def includes(self, pix_x, pix_y):
+#         """
+#         Return true if given pixel is inside this detector.
+#         """
+#         # TODO: expand to take range of pixels?
+#         pass
 
 
 def classify_change(base_frame, new_frame, percent_threshold, max_change):
@@ -33,6 +35,10 @@ def classify_change(base_frame, new_frame, percent_threshold, max_change):
     """
 
     # TODO: expand to use detectors based on dart board location
+
+    # New shit, based on bounding box
+    # cv2.imshow("base", base_frame)
+    # cv2.imshow("new_frame", new_frame)
 
     thresh = _process_change(base_frame, new_frame, 50)
 
@@ -68,13 +74,13 @@ def _process_change(base_img, new_img, thresh):
     # Global threshold
     ret, thresh_img = cv2.threshold(blur, thresh, 255, cv2.THRESH_BINARY) # TODO: thresh value as parameter?
 
-    cv2.imshow("processed", thresh_img)
+    # cv2.imshow("processed", thresh_img)
 
     return thresh_img
 
 def find_arrow(base_img, arrow_img):
     """
-    Both params are gray  valua images.
+    Both params are gray  value images.
     """
 
     # Compute diff
@@ -82,7 +88,7 @@ def find_arrow(base_img, arrow_img):
 
     # Some morphology and thresholding to isolate arrow further
     isolated_arrow_img = _isolate_arrows(diff_img)
-    cv2.imshow("isolatedArrow", isolated_arrow_img)
+    # cv2.imshow("isolatedArrow", isolated_arrow_img)
 
     # Find coordinates within picture based on isolated arrows
     coordinates = _locate_arrow(isolated_arrow_img)
@@ -129,13 +135,13 @@ def _locate_arrow(bw_img):
     """
 
     # First merge arrows that are separated
-    cv2.imshow("bw", bw_img)
+    # cv2.imshow("bw", bw_img)
 
 
     image, contours, hierarchy = cv2.findContours(bw_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     bw_img = cv2.drawContours(bw_img, contours, -1, 255)
 
-    cv2.imshow("cnt", bw_img)
+    # cv2.imshow("cnt", bw_img)
 
     # (x,y),(MA,ma),angle = cv2.fitEllipse(contours[0])
     #
@@ -199,7 +205,7 @@ def _locate_arrow(bw_img):
     print coordinates
 
 
-    cv2.imshow("mass", bw_img)
+    # cv2.imshow("mass", bw_img)
 
     # rows, cols = bw_img.shape[:2]
     # print rows, cols
@@ -225,11 +231,48 @@ def _compute_diff(base_img, new_img):
 # TODO: What change happened? # Arrow? --> isolate and locate. # Camchange --> return that.
 
 # Testing
+# TODO: findarrow works, now: classify change!!!
 
-base = cv2.imread("C:\Users\Torgeir\Desktop\\base.jpg")
-d1 = cv2.imread("C:\Users\Torgeir\Desktop\d1.jpg")
-d2 = cv2.imread("C:\Users\Torgeir\Desktop\d2.jpg")
+# base = cv2.imread("C:\Users\Torgeir\Desktop\\base.jpg")
+# d1 = cv2.imread("C:\Users\Torgeir\Desktop\d1.jpg")
+# d2 = cv2.imread("C:\Users\Torgeir\Desktop\d2.jpg")
 #
+# b = Board()
+# # # center=tuple
+# # #ellipse = ((center),(width,height of bounding rect), angle)
+# center, ellipse, mask = b.detect(base)
+# #
+# # print("center", center)
+# # print("centereclipse", ellipse[0])
+# # print("width, height", ellipse[1])
+# #
+# grayb = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY)
+# d1g = cv2.cvtColor(d1, cv2.COLOR_BGR2GRAY)
+# d2g = cv2.cvtColor(d2, cv2.COLOR_BGR2GRAY)
+# #
+# width = len(base[0])
+# height = len(base)
+# nof_pixels = width * height
+# max_change = nof_pixels * 255
+#
+# bounding_offset = 60
+#
+# x_offset = (ellipse[1][0] / 2)
+# x_center = ellipse[0][0]
+#
+# y_offset = ellipse[1][1] / 2
+# y_center = ellipse[0][1]
+#
+# minx = x_center - x_offset - bounding_offset
+# maxx = x_center + x_offset + bounding_offset
+# miny = y_center - y_offset - bounding_offset
+# maxy = y_center + y_offset + bounding_offset
+#
+# percent, change = classify_change(grayb, d1g, 0.01, max_change, (int(minx, miny)), (maxx, maxy))
+#
+
+"""
+
 # width = len(base[0])
 # height = len(base)
 # nof_pixels = width * height
@@ -253,5 +296,6 @@ find_arrow(grayb, d2g)
 # print classify_change(grayb, d2g, 1.0, max_change)
 #
 #
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+"""
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()

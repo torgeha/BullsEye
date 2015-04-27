@@ -7,15 +7,15 @@ from sklearn import neighbors
 
 class DartLearner:
 
-    SAMPLE_FILENAME = "dart/ocr/dart_samples.data"
-    RESPONSE_FILENAME = "dart/ocr/dart_targets.data"
+    SAMPLE_FILENAME = "ocr/dart_samples.data"
+    RESPONSE_FILENAME = "ocr/dart_targets.data"
 
     def __init__(self, samples=None, responses=None):
         self.number = 20
         self.model = neighbors.KNeighborsClassifier(self.number, weights='distance')
         if samples and responses:
             if isinstance(samples, basestring):
-                print(samples)
+                # print(samples)
                 samples = np.loadtxt(samples,np.float32)
             if isinstance(responses, basestring):
                 responses = np.loadtxt(responses,np.float32)

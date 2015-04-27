@@ -4,7 +4,8 @@ import time
 import threading
 from Queue import Queue
 
-from framediff import classify_change, find_arrow
+from cv.framediff import classify_change, find_arrow
+from cv.board import Board
 
 print cv2.__version__
 
@@ -34,10 +35,11 @@ class Camera:
         ret, frame = self.video.read()
         self.width = len(frame[0])
         self.height = len(frame)
-        self.nof_pixels = self.width * self.height
-        self.max_change = self.nof_pixels * 255
+        # self.nof_pixels = self.width * self.height
+        # self.max_change = self.nof_pixels * 255
+        self.board = Board()
 
-        print self.max_change
+        # print self.max_change
 
         self.capture()
 
@@ -47,6 +49,7 @@ class Camera:
         ret, base_frame = self.video.read()
         # base_frame = self.buffer.get_frame()
         last_frame = base_frame
+        roi_last = None
         base_frame_gray = cv2.cvtColor(base_frame, cv2.COLOR_BGR2GRAY)
         last_frame_gray = base_frame_gray
 
@@ -61,10 +64,13 @@ class Camera:
         # If live feed, dont wait, else wait
         wait_per_frame = 25
         if self.is_live:
-            wait_per_frame = 1
+            wait_per_frame = 1000
 
         # Evaluation fps stuff
         loop_count = 0
+
+        # Padding for the board bounding box
+        bounding_offset = 70
 
         while (True):
             # Sleep management. Limit fps.
@@ -85,7 +91,8 @@ class Camera:
             if new_frame == None:
                 print "END OF VIDEO, BREAKING"
                 break # no more frames to read
-
+            cv2.imshow("FEED", new_frame)
+            cv2.waitKey(1)
             # print "lfc", last_frame_changed
             # print "lfa", last_frame_arrow
 
@@ -93,13 +100,54 @@ class Camera:
             # if self.should_display:
             #     cv2.imshow('Feed', new_frame)
 
+            # Detect board and use it to base the finding of changes
+            center, ellipse, mask = self.board.detect(new_frame)
+
+            # TODO: no baseframe until board is detected. Set boundingbox, check this for change
+
+            # Should not be None
+            if center is None:
+                print("skipping frame")
+                continue
+            if ellipse is None:
+                print("skipping frame")
+                continue
+            if mask is None:
+                print("skipping frame")
+                continue
+
+            cv2.imshow("MASK", mask)
+
+            # Get the bounding box of the detected board: ((minx, miny),(maxx, maxy))
+            board_bounding_box = self._get_bounding_box(ellipse, bounding_offset)
+
             new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
+
+            # Crop new frame, find ROI. Use same bounging box on both
+            roi_new = new_frame_gray[board_bounding_box[0][1]:board_bounding_box[1][1], board_bounding_box[0][0]:board_bounding_box[1][0]]
+            roi_last = last_frame_gray[board_bounding_box[0][1]:board_bounding_box[1][1], board_bounding_box[0][0]:board_bounding_box[1][0]]
+
+            # Find max change based on ROI
+            # TODO: move into method ----------------------
+            width = len(roi_new[0])
+            height = len(roi_new)
+            nof_pixels = width * height
+            max_change = nof_pixels * 255
+            # TODO: --------------------------------------
 
             # TODO: nothing changed? --> continue
             # TODO: camera/arrow --> wait x frames and find arrow_pos/set new base frame
 
-            change_percent, change = classify_change(last_frame_gray, new_frame_gray, percent_threshold, self.max_change)
-
+            # Only find change if there was a last frame
+            if not roi_last is None:
+                # change_percent, change = classify_change(last_frame_gray,
+                #                                          new_frame_gray,
+                #                                          percent_threshold,
+                #                                          self.max_change)
+                change_percent, change = classify_change(roi_last,
+                                                         roi_new,
+                                                         percent_threshold,
+                                                         max_change)
             print "change: ", change_percent, " value: ", change
 
             if cv2.waitKey(wait_per_frame) & 0xFF == ord('q'):
@@ -132,10 +180,25 @@ class Camera:
             elif change == 2: # Camera change, check next until no change, then set base
                 last_frame_changed = True
 
+            # roi_last = roi_new
             last_frame = new_frame
             last_frame_gray = new_frame_gray
 
         cv2.destroyAllWindows()
+
+    def _get_bounding_box(self, ellipse, bounding_offset):
+        x_offset = (ellipse[1][0] / 2)
+        x_center = ellipse[0][0]
+
+        y_offset = ellipse[1][1] / 2
+        y_center = ellipse[0][1]
+
+        minx = max(0, x_center - x_offset - bounding_offset)
+        maxx = min(self.width, x_center + x_offset + bounding_offset)
+        miny = max(0, y_center - y_offset - bounding_offset)
+        maxy = min(self.height, y_center + y_offset + bounding_offset)
+
+        return ((int(minx), int(miny)), (int(maxx), int(maxy)))
 
 class CameraBuffer:
     # TODO: run in own thread??

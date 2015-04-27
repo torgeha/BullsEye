@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import math
-from matplotlib import pyplot as plt
-import matplotlib.cm as cm
+# from matplotlib import pyplot as plt
+# import matplotlib.cm as cm
 from collections import deque
 
 class Utility:
@@ -190,3 +190,13 @@ class Utility:
 
         ax.format_coord = format_coord
         plt.show()
+
+    @staticmethod
+    def compute_diff(base_img, new_img):
+        """
+        Return new_image - base_img.
+        Images should be
+        """
+        diff_img = cv2.subtract(new_img, base_img, dtype=cv2.CV_16S)
+        diff_img = cv2.convertScaleAbs(diff_img)
+        return diff_img

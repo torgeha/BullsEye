@@ -54,8 +54,16 @@ class Board:
         #for ctn in [board_sector]:
         #    cv2.drawContours(blurred,[cnt],0,255,-1)
 
+        # Added to get rid of crash when contours was empty in _identify_board()
+        if board_sector is None:
+            return None, None, None
+
         if not self._is_valid(red_scores, green_scores):
             print("Red scores or green scores are not valid")
+
+            # cv2.imshow("red", red_mask)
+            # cv2.imshow("green", green_mask)
+            # cv2.waitKey(0)
             return None, None, None
             #TODO: error handling. Remove or fix stuff
 
@@ -231,6 +239,8 @@ class Board:
     def _identify_board(self, thresh):
         #TODO: move to identify, use threshold elsewhere
         img,contours,hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        if len(contours) == 0:
+            return None
         max_contour = max(contours, key=lambda c: cv2.arcLength(c, True))
 
 
