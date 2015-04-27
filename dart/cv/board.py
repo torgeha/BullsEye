@@ -95,7 +95,7 @@ class Board:
 
 
     def _is_valid(self, red_scores, green_scores):
-        return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) == Board.NR_COLORED_SEGMENTS+1
+        return len(red_scores) ==Board.NR_COLORED_SEGMENTS and len(green_scores) >= Board.NR_COLORED_SEGMENTS and len(green_scores <= Board.NR_COLORED_SEGMENTS+1)
 
     def _create_score_mask(self, size, ellipse, red, green, center, predictions):
         shape = (size[0], size[1])
