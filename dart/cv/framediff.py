@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-# from utility import Utility
+from utility import Utility
 
 def classify_change(base_frame, new_frame, percent_threshold, max_change):
     """
@@ -17,7 +17,7 @@ def classify_change(base_frame, new_frame, percent_threshold, max_change):
     # cv2.imshow("base", base_frame)
     # cv2.imshow("new_frame", new_frame)
 
-    thresh = _process_change(base_frame, new_frame, 50)
+    thresh = _process_change(base_frame, new_frame, 70)
 
     # Sum of pixels
     pixel_sum = cv2.sumElems(thresh)[0] # TODO: more efficient way to do this?
@@ -46,33 +46,48 @@ def _process_change(base_img, new_img, thresh):
 
     # Gaussian blur
     blur = cv2.GaussianBlur(diff_img, (5, 5), 0)
-    # cv2.imshow("blur", blur)
+    # cv2.imshow("blur2", blur)
 
     # Global threshold
     ret, thresh_img = cv2.threshold(blur, thresh, 255, cv2.THRESH_BINARY) # TODO: thresh value as parameter?
 
-    # cv2.imshow("processed", thresh_img)
+    # cv2.imshow("thresh3", thresh_img)
 
     return thresh_img
 
-def find_arrow(base_img, arrow_img):
+def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
     """
     Both params are gray  value images.
     """
 
     # Compute diff
-    diff_img = _compute_diff(base_img, arrow_img)
+    # diff_img = _compute_diff(base_gray, arrow_gray)
+    diff_img = _process_change(base_gray, arrow_gray, 70)
 
-    # TODO> and with blue
+    # Separate the channels
+    b,g,r = cv2.split(arrow_img)
 
-    cv2.imshow("DIFF 1", diff_img)
+    # Extract the blue
+    diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
+    blue = np.greater(diff, 50) # TODO: Use static parameter like this?
+
+    # De-normalize. range(0-255)
+    blue = Utility.convert_to_cv(blue)
+
+    # cv2.imshow("Blue", blue)
+
+    # TODO: find out what is needed in the isolate_arrow method.
+
+    # cv2.imshow("DIFF 1", diff_img)
     # Some morphology and thresholding to isolate arrow further
     isolated_arrow_img = _isolate_arrows(diff_img)
-    cv2.imshow("dilate 6", isolated_arrow_img)
+    cv2.imshow("isolated arrow", isolated_arrow_img)
+
+    return isolated_arrow_img
 
     # Find coordinates within picture based on isolated arrows
-    coordinates = _locate_arrow(isolated_arrow_img)
-    print "Coordinates of "
+    # coordinates = _locate_arrow(isolated_arrow_img)
+    # print "Coordinates of ", coordinates
 
     # TODO: return coordinates here?
 
@@ -81,6 +96,48 @@ def find_arrow(base_img, arrow_img):
     #     cv2.circle(arrow_img, c, 2, 255)
     # cv2.imshow("points", arrow_img)
 
+def get_coordinate(arrow_img):
+    return _locate_arrow(arrow_img)
+
+def extract_arrow(arrow1, arrow2):
+    # (not arrow1) and arrow2
+    strel = np.ones((5, 5), np.uint8)
+    arrow1 = cv2.morphologyEx(arrow1, cv2.MORPH_DILATE, strel)
+    # cv2.imshow("not this", arrow1)
+    # cv2.imshow("adn with this", arrow2)
+    return cv2.bitwise_and(cv2.bitwise_not(arrow1), arrow2)
+    # return cv2.bitwise_xor(arrow1, arrow2)
+
+def join_contours(arrow_img):
+    image, contours, hierarchy = cv2.findContours(arrow_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    arrow_img = cv2.drawContours(arrow_img, contours, -1, 255,-1)
+    # cv2.drawContours(blurred,contours,-1,255,-1)
+    cv2.imshow("after count", arrow_img)
+    if len(contours) == 0:
+        return None
+    elif len(contours) == 1:
+        return True
+
+    # Find centroids
+    centers = []
+    for cnt in contours:
+        # M = cv2.moments(cnt)
+        #
+        # if M['m00'] == 0.0 or M['m00'] == 0.0:
+        #     return None
+        #
+        # centroid_x = int(M['m10']/M['m00'])
+        # centroid_y = int(M['m01']/M['m00'])
+        x, y = Utility.get_centroid(cnt)
+        if x < 10 or y < 10:
+            continue
+        centers.append(Utility.get_centroid(cnt))
+
+    # Draw line from each centroid to the next
+    cnt = centers[0]
+    for p in centers:
+        cv2.line(arrow_img, cnt, p, (255,255,255), thickness=2)
+    return True
 
 def _isolate_arrows(diff_img):
     """
@@ -88,26 +145,35 @@ def _isolate_arrows(diff_img):
     Returns bw-img with arrow contours.
     """
 
-    strel = np.ones((3, 3), np.uint8)
+    strel = np.ones((4, 4), np.uint8)
     open = cv2.morphologyEx(diff_img, cv2.MORPH_OPEN, strel)
-    cv2.imshow("open 2", open)
+    # cv2.imshow("open 2", open)
 
-    blur = cv2.GaussianBlur(open, (5, 5), 0)
-    cv2.imshow("blur 3", blur)
+    strel2 = np.ones((20, 20), np.uint8)
+    dilate = cv2.morphologyEx(open, cv2.MORPH_DILATE, strel2)
+    # cv2.imshow("dialted 3", dilate)
 
-    ret, thresh_img = cv2.threshold(blur, 20, 255, cv2.THRESH_BINARY)
+    anded = cv2.bitwise_and(diff_img, dilate)
+    # cv2.imshow("anded 4", anded)
 
-    cv2.imshow("thresh 4", thresh_img)
 
-    strel2 = np.ones((5, 5), np.uint8)
-    open_thresh = cv2.morphologyEx(thresh_img, cv2.MORPH_OPEN, strel2)
-    cv2.imshow("open 5", open_thresh)
+
+    # blur = cv2.GaussianBlur(open, (5, 5), 0)
+    # cv2.imshow("blur 3", blur)
+
+    # ret, thresh_img = cv2.threshold(blur, 20, 255, cv2.THRESH_BINARY)
+
+    # cv2.imshow("thresh 4", thresh_img)
+
+    # strel2 = np.ones((5, 5), np.uint8)
+    # open_thresh = cv2.morphologyEx(thresh_img, cv2.MORPH_OPEN, strel2)
+    # cv2.imshow("open 5", open_thresh)
 
     # Dilating to merge blobs belonging to the same arrow together
-    strel3 = np.ones((5, 5), np.uint8)
-    open_thresh = cv2.morphologyEx(open_thresh, cv2.MORPH_DILATE, strel3)
+    # strel3 = np.ones((5, 5), np.uint8)
+    # open_thresh = cv2.morphologyEx(open_thresh, cv2.MORPH_DILATE, strel3)
 
-    return open_thresh
+    return anded
 
 def _locate_arrow(bw_img):
     """
@@ -133,11 +199,11 @@ def _locate_arrow(bw_img):
     # Find centroid of every cnt and point furthest away from it
     centers = []
     for cnt in contours:
-
-        M = cv2.moments(cnt)
-        centroid_x = int(M['m10']/M['m00'])
-        centroid_y = int(M['m01']/M['m00'])
-        centers.append((centroid_x, centroid_y))
+        #
+        # M = cv2.moments(cnt)
+        # centroid_x = int(M['m10']/M['m00'])
+        # centroid_y = int(M['m01']/M['m00'])
+        centers.append(Utility.get_centroid(cnt))
         # cv2.circle(bw_img, (centroid_x, centroid_y), 2, 255)
 
     # find extreme points

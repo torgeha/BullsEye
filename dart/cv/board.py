@@ -47,8 +47,8 @@ class Board:
         thresh = self._theshold(blurred)
         #TODO: Make outline and center available as self.
         red_mask, green_mask = self._color_difference_segmentation(blurred)
-        cv2.imshow("dfd", thresh)
-        cv2.waitKey(1)
+        # cv2.imshow("dfd", thresh)
+        # cv2.waitKey(1)
         red_mask = self._prune_board(thresh, red_mask)
         green_mask = self._prune_board(thresh, green_mask)
         red_scores = self._create_description_areas(red_mask)

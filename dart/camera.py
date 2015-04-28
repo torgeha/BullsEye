@@ -5,8 +5,9 @@ import threading
 from Queue import Queue
 from numpy.lib.type_check import _getmaxmin
 
-from cv.framediff import classify_change, find_arrow
+from cv.framediff import classify_change, find_arrow, extract_arrow, get_coordinate, join_contours
 from cv.board import Board
+from dartgame.classical import Classical
 
 print cv2.__version__
 
@@ -37,6 +38,7 @@ class Camera:
         self.width = len(frame[0])
         self.height = len(frame)
         self.board = Board()
+        self.game = Classical()
 
         self.capture()
 
@@ -52,7 +54,7 @@ class Camera:
         last_frame_gray = base_frame_gray
 
         # All changes under this will be ignored
-        percent_threshold = 0.02
+        percent_threshold = 0.05
 
         # Fps stuff
         loop_delta = 1./self.fps_limit
@@ -68,6 +70,12 @@ class Camera:
         # Padding for the board bounding box
         bounding_offset = 70
 
+        # skip_frame = False
+
+        nof_arrows = 0
+        arrow_img1 = None
+        arrow_img2 = None
+
         while (True):
             # Sleep management. Limit fps.
             if self.is_live: # only sleep
@@ -78,7 +86,7 @@ class Camera:
             # Loop frequency evaluation, prints actual fps
             previous_time, current_time = current_time, time.clock()
             time_delta = current_time - previous_time
-            print 'frequency: %s' % (1. / time_delta)
+            # print 'frequency: %s' % (1. / time_delta)
 
             ret, new_frame = self.video.read()
             # new_frame = self.buffer.get_frame()
@@ -87,6 +95,10 @@ class Camera:
                 break # no more frames to read
             cv2.imshow("FEED", new_frame)
             cv2.waitKey(1)
+
+            # if skip_frame:
+            #     skip_frame = False
+            #     continue
 
             # Detect board and use it to base the finding of changes
             # Bounding box is none before a baseframe is found
@@ -114,6 +126,7 @@ class Camera:
                 print "************* NEW BASE SET ****************"
                 print " ..and bounding box is", bounding_box
                 cv2.imshow("BASE", base_frame)
+                # skip_frame = True
                 continue
 
             # Crop frame, find Roi of current frame and last frame
@@ -151,9 +164,52 @@ class Camera:
                     # cv2.imshow("arrow", frame_with_arrow)
                     # cv2.imshow("arrowgray", last_frame_gray)
 
-                    find_arrow(base_frame_gray, last_frame_gray)
+                    coordinate = None
 
-                    # Set last_frame_arrow = False
+                    if nof_arrows == 0:
+                        arrow_img1 = find_arrow(base_frame, last_frame, base_frame_gray, last_frame_gray)
+                        joined_cunt = join_contours(arrow_img1)
+                        cv2.imshow("joined 1", arrow_img1)
+                        if not (joined_cunt == None):
+                            print "one arrow"
+                            coordinate = get_coordinate(arrow_img1.copy())
+                            nof_arrows += 1
+                            coordinate = coordinate[0]
+                            score = self.get_score(coordinate)
+                            print "Score: ", score
+                            self.game.add_hit(score, coordinate[0], coordinate[1])
+                    elif nof_arrows == 1:
+                        arrow_img2 = find_arrow(base_frame, last_frame, base_frame_gray, last_frame_gray)
+                        arr = extract_arrow(arrow_img1, arrow_img2)
+                        # cv2.imshow("Extracted", arr)
+                        joined_cunt = join_contours(arr)
+                        cv2.imshow("joined 2", arr)
+                        if not (joined_cunt == None):
+                            print "two arrow"
+                            coordinate = get_coordinate(arr)
+                            nof_arrows += 1
+                            coordinate = coordinate[0]
+                            score = self.get_score(coordinate)
+                            print "Score: ", score
+                            self.game.add_hit(score, coordinate[0], coordinate[1])
+                    elif nof_arrows == 2:
+                        arrow_img3 = find_arrow(base_frame, last_frame, base_frame_gray, last_frame_gray)
+                        arr = extract_arrow(arrow_img2, arrow_img3)
+                        joined_cunt = join_contours(arr)
+                        if not (joined_cunt == None):
+                            print "Third Arrow"
+                            cv2.imshow("joined 3", arr)
+                            coordinate = get_coordinate(arr)
+                            nof_arrows = 0
+                            coordinate = coordinate[0]
+                            score = self.get_score(coordinate)
+                            print "Score: ", score
+                            self.game.add_hit(score, coordinate[0], coordinate[1])
+                            self.game.next_player()
+
+
+                    print "Coordinates", coordinate
+
                     last_frame_arrow = False
                 continue
             elif change == 1: # New arrow, wait until stable
@@ -173,6 +229,11 @@ class Camera:
         """
         Return baseframe
         """
+
+    def get_score(self, coordinate):
+        # cv2.imshow("gettingscorefromthis", self.point_mask)
+        # print "Getting this", coordinate, "x is", coordinate[0], " y is ", coordinate[1]
+        return self.point_mask[coordinate[1]][coordinate[0]]
 
     def _get_max_change(self, roi):
         width = len(roi[0])
@@ -198,6 +259,9 @@ class Camera:
         if mask is None:
             print("skipping frame")
             return None
+
+        self.point_mask = mask
+        # cv2.imshow("mask", mask)
 
         x_offset = (ellipse[1][0] / 2)
         x_center = ellipse[0][0]

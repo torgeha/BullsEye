@@ -40,7 +40,7 @@ class Player:
             if self.score == 0:
                 return True
         else:
-            print("Invalid shot, did not go to zero"
+            print("Invalid shot, did not go to zero")
         return False
 
 
