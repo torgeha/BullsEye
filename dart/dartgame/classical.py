@@ -8,23 +8,25 @@ class Classical:
         self.players = [Player(i,501) for i in range(players)]
         self.current = 0
 
-
     def next_player(self):
         self.players[self.current].store_round()
         self.current = (self.current + 1)%len(self.players)
 
     def add_hit(self, score, x, y):
-        self.players[self.current].add_hit((score, x,y))
+        is_winner = self.players[self.current].add_hit((score, x,y))
+        if is_winner:
+            print(str(self.players[self.current].id) + " is the winner!! Congrats")
 
     def get_leading_player(self):
         return min(self.players, key=lambda k: k.score)
 
     def get_game_standing(self):
         return [p.status() for p in self.players]
-    
+
 class Player:
 
     def __init__(self, id, start_score, name="None"):
+        #TODO: Number of arrows to zero
         self.id = id
         self.name = name
         self.score = start_score
@@ -32,8 +34,14 @@ class Player:
         self.current_round = []
 
     def add_hit(self, data):
-        self.current_round.append(data)
-        self.score -= data[0]
+        if self.score - data[0] >= 0:
+            self.current_round.append(data)
+            self.score -= data[0]
+            if self.score == 0:
+                return True
+        else:
+            print("Invalid shot, did not go to zero"
+        return False
 
 
     def add_miss(self):
