@@ -113,10 +113,10 @@ class Board:
         self._draw_special(mask,red, (r,r2, 50))
         for i,cnt in enumerate(green[0]):
             c = cnt[2]
-            cv2.putText(mask,str(g[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
+            #cv2.putText(mask,str(g[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
         for i,cnt in enumerate(red[0]):
             c = cnt[2]
-            cv2.putText(mask,str(r[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
+            #cv2.putText(mask,str(r[i]),(Utility.get_centroid(c)),0,1,255, thickness=1)
         return mask
 
     def _get_scores_for_contours(self, contours, predictions, center):

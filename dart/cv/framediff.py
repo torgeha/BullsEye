@@ -64,15 +64,17 @@ def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
     # diff_img = _compute_diff(base_gray, arrow_gray)
     diff_img = _process_change(base_gray, arrow_gray, 70)
 
+    # cv2.imshow("DIFF", diff_img)
+
     # Separate the channels
-    b,g,r = cv2.split(arrow_img)
+    # b,g,r = cv2.split(arrow_img)
 
     # Extract the blue
-    diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
-    blue = np.greater(diff, 50) # TODO: Use static parameter like this?
+    # diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
+    # blue = np.greater(diff, 50) # TODO: Use static parameter like this?
 
     # De-normalize. range(0-255)
-    blue = Utility.convert_to_cv(blue)
+    # blue = Utility.convert_to_cv(blue)
 
     # cv2.imshow("Blue", blue)
 
@@ -101,7 +103,7 @@ def get_coordinate(arrow_img):
 
 def extract_arrow(arrow1, arrow2):
     # (not arrow1) and arrow2
-    strel = np.ones((5, 5), np.uint8)
+    strel = np.ones((7, 7), np.uint8)
     arrow1 = cv2.morphologyEx(arrow1, cv2.MORPH_DILATE, strel)
     # cv2.imshow("not this", arrow1)
     # cv2.imshow("adn with this", arrow2)
