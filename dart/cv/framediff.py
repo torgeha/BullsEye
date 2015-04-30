@@ -71,7 +71,7 @@ def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
 
     # Extract the blue
     # diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
-    # blue = np.greater(diff, 50) # TODO: Use static parameter like this?
+    # blue = np.greater(diff, 50)
 
     # De-normalize. range(0-255)
     # blue = Utility.convert_to_cv(blue)
@@ -91,13 +91,6 @@ def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
     # coordinates = _locate_arrow(isolated_arrow_img)
     # print "Coordinates of ", coordinates
 
-    # TODO: return coordinates here?
-
-
-    # for c in coordinates:
-    #     cv2.circle(arrow_img, c, 2, 255)
-    # cv2.imshow("points", arrow_img)
-
 def get_coordinate(arrow_img):
     return _locate_arrow(arrow_img)
 
@@ -107,8 +100,8 @@ def extract_arrow(arrow1, arrow2):
     arrow1 = cv2.morphologyEx(arrow1, cv2.MORPH_DILATE, strel)
     # cv2.imshow("not this", arrow1)
     # cv2.imshow("adn with this", arrow2)
+    # Return ((not arrow1) and arrow2)
     return cv2.bitwise_and(cv2.bitwise_not(arrow1), arrow2)
-    # return cv2.bitwise_xor(arrow1, arrow2)
 
 def join_contours(arrow_img):
     image, contours, hierarchy = cv2.findContours(arrow_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -123,13 +116,6 @@ def join_contours(arrow_img):
     # Find centroids
     centers = []
     for cnt in contours:
-        # M = cv2.moments(cnt)
-        #
-        # if M['m00'] == 0.0 or M['m00'] == 0.0:
-        #     return None
-        #
-        # centroid_x = int(M['m10']/M['m00'])
-        # centroid_y = int(M['m01']/M['m00'])
         x, y = Utility.get_centroid(cnt)
         if x < 10 or y < 10:
             continue
@@ -157,8 +143,6 @@ def _isolate_arrows(diff_img):
 
     anded = cv2.bitwise_and(diff_img, dilate)
     # cv2.imshow("anded 4", anded)
-
-
 
     # blur = cv2.GaussianBlur(open, (5, 5), 0)
     # cv2.imshow("blur 3", blur)
