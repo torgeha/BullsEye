@@ -3,7 +3,6 @@ import cv2
 import time
 import threading
 from Queue import Queue
-from numpy.lib.type_check import _getmaxmin
 
 from cv.framediff import classify_change, find_arrow, extract_arrow, get_coordinate, join_contours
 from cv.board import Board
@@ -30,10 +29,6 @@ class Camera:
 
         self.should_display = should_display
 
-        # ret, frame = self.cap.read()
-        # if self.buffer.buffer.empty():
-        #     time.sleep(0.5)
-        # frame = self.buffer.get_frame()
         ret, frame = self.video.read()
         self.width = len(frame[0])
         self.height = len(frame)
@@ -65,7 +60,7 @@ class Camera:
         # If live feed, dont wait, else wait
         wait_per_frame = 25
         if self.is_live:
-            wait_per_frame = 1000
+            wait_per_frame = 1
 
         # Padding for the board bounding box
         bounding_offset = 70
@@ -86,7 +81,7 @@ class Camera:
             # Loop frequency evaluation, prints actual fps
             previous_time, current_time = current_time, time.clock()
             time_delta = current_time - previous_time
-            # print 'frequency: %s' % (1. / time_delta)
+            print 'frequency: %s' % (1. / time_delta)
 
             ret, new_frame = self.video.read()
             # new_frame = self.buffer.get_frame()
@@ -95,10 +90,6 @@ class Camera:
                 break # no more frames to read
             cv2.imshow("FEED", new_frame)
             cv2.waitKey(1)
-
-            # if skip_frame:
-            #     skip_frame = False
-            #     continue
 
             # Detect board and use it to base the finding of changes
             # Bounding box is none before a baseframe is found
@@ -152,11 +143,6 @@ class Camera:
                     # By setting the boudning_box to None, the next loop will set new base when bounding box is found
                     bounding_box = None
 
-                    # base_frame = new_frame
-                    # base_frame_gray = new_frame_gray
-                    # cv2.imshow('baseframe', base_frame)
-                    # last_frame_changed = False
-                    # print "**************************  NEW BASE"
                 elif last_frame_arrow:
                     # Arrow detected in last frame, now stable, find location
                     # TODO since there was no change from last frame, find arrow from base_frame and arrow_frame
@@ -276,7 +262,6 @@ class Camera:
         return ((int(minx), int(miny)), (int(maxx), int(maxy)))
 
 class CameraBuffer:
-    # TODO: run in own thread??
     # DO NOT USE!!!
 
     def __init__(self, interface, path=None):
@@ -296,7 +281,6 @@ class CameraBuffer:
             t = threading.Thread(target=self._capture)
             t.daemon = True
             t.start()
-            # self._capture() # This should be in own thread!!
 
     def _capture(self):
         ret, frame = self.video.read()
@@ -317,49 +301,5 @@ class CameraBuffer:
 
 if __name__ == "__main__":
     cam = Camera(2, 5, 5, True)
-
-
-# Testing
-
-# path = "C:\Users\Torgeir\Desktop\dartH264"
-#
-# path = path + "\dart2.mp4"
-
-# cap = cv2.VideoCapture(path)
-#
-# while(cap.isOpened()):
-#     ret, frame = cap.read()
-#
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#
-#     cv2.imshow('frame',gray)
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
-#
-# cap.release()
-# cv2.destroyAllWindows()
-
-# b = CameraBuffer(0, path)
-#
-# frame = b.get_frame()
-# # print frame
-#
-# loop_delta = 1./25
-# current_time = target_time = time.clock()
-# while frame != None:
-#     target_time += loop_delta
-#     sleep_time = target_time - time.clock()
-#     if sleep_time > 0:
-#         time.sleep(sleep_time)
-#     print "frame"
-#     cv2.imshow("frame", frame)
-#     frame = b.get_frame()
-#
-# cv2.destroyAllWindows()
-
-
-
-
-# print path
 
 

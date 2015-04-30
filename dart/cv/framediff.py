@@ -20,12 +20,11 @@ def classify_change(base_frame, new_frame, percent_threshold, max_change):
     thresh = _process_change(base_frame, new_frame, 70)
 
     # Sum of pixels
-    pixel_sum = cv2.sumElems(thresh)[0] # TODO: more efficient way to do this?
+    pixel_sum = cv2.sumElems(thresh)[0]
 
     # Percent of frame that differs
     change_percent = (pixel_sum / max_change) * 100
 
-    # TODO: tune these parameters to dart board
     if change_percent < percent_threshold: # Change is under percent_threshold, nothing changed
         return (change_percent, 0)
     elif change_percent < 7: # Change is more than thresh, less than 1.5 --> arrow
@@ -64,19 +63,19 @@ def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
     # diff_img = _compute_diff(base_gray, arrow_gray)
     diff_img = _process_change(base_gray, arrow_gray, 70)
 
+    # cv2.imshow("DIFF", diff_img)
+
     # Separate the channels
-    b,g,r = cv2.split(arrow_img)
+    # b,g,r = cv2.split(arrow_img)
 
     # Extract the blue
-    diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
-    blue = np.greater(diff, 50) # TODO: Use static parameter like this?
+    # diff = cv2.subtract(b, r, dtype=cv2.CV_16S)
+    # blue = np.greater(diff, 50)
 
     # De-normalize. range(0-255)
-    blue = Utility.convert_to_cv(blue)
+    # blue = Utility.convert_to_cv(blue)
 
     # cv2.imshow("Blue", blue)
-
-    # TODO: find out what is needed in the isolate_arrow method.
 
     # cv2.imshow("DIFF 1", diff_img)
     # Some morphology and thresholding to isolate arrow further
@@ -85,28 +84,17 @@ def find_arrow(base_img, arrow_img, base_gray, arrow_gray):
 
     return isolated_arrow_img
 
-    # Find coordinates within picture based on isolated arrows
-    # coordinates = _locate_arrow(isolated_arrow_img)
-    # print "Coordinates of ", coordinates
-
-    # TODO: return coordinates here?
-
-
-    # for c in coordinates:
-    #     cv2.circle(arrow_img, c, 2, 255)
-    # cv2.imshow("points", arrow_img)
-
 def get_coordinate(arrow_img):
     return _locate_arrow(arrow_img)
 
 def extract_arrow(arrow1, arrow2):
     # (not arrow1) and arrow2
-    strel = np.ones((5, 5), np.uint8)
+    strel = np.ones((7, 7), np.uint8)
     arrow1 = cv2.morphologyEx(arrow1, cv2.MORPH_DILATE, strel)
     # cv2.imshow("not this", arrow1)
     # cv2.imshow("adn with this", arrow2)
+    # Return ((not arrow1) and arrow2)
     return cv2.bitwise_and(cv2.bitwise_not(arrow1), arrow2)
-    # return cv2.bitwise_xor(arrow1, arrow2)
 
 def join_contours(arrow_img):
     image, contours, hierarchy = cv2.findContours(arrow_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -121,13 +109,6 @@ def join_contours(arrow_img):
     # Find centroids
     centers = []
     for cnt in contours:
-        # M = cv2.moments(cnt)
-        #
-        # if M['m00'] == 0.0 or M['m00'] == 0.0:
-        #     return None
-        #
-        # centroid_x = int(M['m10']/M['m00'])
-        # centroid_y = int(M['m01']/M['m00'])
         x, y = Utility.get_centroid(cnt)
         if x < 10 or y < 10:
             continue
@@ -155,8 +136,6 @@ def _isolate_arrows(diff_img):
 
     anded = cv2.bitwise_and(diff_img, dilate)
     # cv2.imshow("anded 4", anded)
-
-
 
     # blur = cv2.GaussianBlur(open, (5, 5), 0)
     # cv2.imshow("blur 3", blur)
@@ -191,20 +170,11 @@ def _locate_arrow(bw_img):
     # cv2.imshow("cnt", bw_img)
 
     # (x,y),(MA,ma),angle = cv2.fitEllipse(contours[0])
-    #
-    # print x, y
-    # print MA, ma
-    # print angle
 
     # Find centroid of every cnt and point furthest away from it
     centers = []
     for cnt in contours:
-        #
-        # M = cv2.moments(cnt)
-        # centroid_x = int(M['m10']/M['m00'])
-        # centroid_y = int(M['m01']/M['m00'])
         centers.append(Utility.get_centroid(cnt))
-        # cv2.circle(bw_img, (centroid_x, centroid_y), 2, 255)
 
     # find extreme points
     index = 0
@@ -230,43 +200,9 @@ def _locate_arrow(bw_img):
 
         coordinates.append(tuple(points[max_index]))
 
-        # cv2.circle(bw_img, tuple(points[max_index]), 2, 255)
-        # cv2.circle(bw_img, rightmost, 2, 255)
-        # cv2.circle(bw_img, topmost, 2, 255)
-        # cv2.circle(bw_img, bottommost, 2, 255)
-
-        # print leftmost, rightmost, topmost, bottommost
-        # print centers[index]
-        #
-        # print type(leftmost), leftmost
-        # print type(centers[index]), centers[index]
-        # print type(lt), lt
-        # print type(c), c
-
-        # dist = np.linalg.norm(lt - c)
-
-        # print dist
-
         index += 1
 
     print coordinates
-
-
-    # cv2.imshow("mass", bw_img)
-
-    # rows, cols = bw_img.shape[:2]
-    # print rows, cols
-
-    # loop through contours
-    # for i in range(len(contours)):
-    #     [vx, vy, x, y] = cv2.fitLine(contours[i], cv2.DIST_L2, 0, 0.01, 0.01)
-    #     # print vx, vy, x, y
-    #     lefty = int((-x * vy / vx) + y)
-    #     righty = int(((cols - x) * vy / vx) + y)
-    #     bw_img = cv2.line(bw_img, (cols - 1, righty), (0, lefty), 255, 2)
-    #
-    # cv2.imshow("line", bw_img)
-
     return coordinates
 
 def _compute_diff(base_img, new_img):
@@ -275,10 +211,8 @@ def _compute_diff(base_img, new_img):
     diff_img = cv2.convertScaleAbs(diff_img)
     return diff_img
 
-# TODO: What change happened? # Arrow? --> isolate and locate. # Camchange --> return that.
 
 # Testing
-# TODO: findarrow works, now: classify change!!!
 
 # base = cv2.imread("C:\Users\Torgeir\Desktop\\base.jpg")
 # d1 = cv2.imread("C:\Users\Torgeir\Desktop\d1.jpg")
