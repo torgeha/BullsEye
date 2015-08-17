@@ -11,8 +11,8 @@ class DartLearner:
     RESPONSE_FILENAME = "dart/ocr/dart_targets.data"
 
     def __init__(self, samples=None, responses=None):
-        self.number = 20
-        self.model = neighbors.KNeighborsClassifier(self.number, weights='distance')
+        self.number = 10
+        self.model = neighbors.KNeighborsClassifier(n_neighbors=self.number, weights='distance')
         if samples and responses:
             if isinstance(samples, basestring):
                 print(samples)

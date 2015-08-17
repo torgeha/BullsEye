@@ -261,6 +261,7 @@ class Board:
         des = cv2.bitwise_not(thresh)
         #Hole filling
         #TODO: Generalize , so findcountours does not get called like 10 times.
+        #TODO: hwhat is tis?
         img,contours,hierarchy = cv2.findContours(des,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
         for cnt in contours:
             cv2.drawContours(des,[cnt],0,255,-1)
